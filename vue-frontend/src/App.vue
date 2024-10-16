@@ -9,6 +9,15 @@
 
 <script setup>
 import NavbarComponent from './components/NavbarComponent.vue';
+import { ref, provide, onMounted } from 'vue'
+import { fetchCameras } from './apiTools'
+
+const cameras = ref([])
+provide('cameras', cameras)
+
+onMounted(async () => {
+  cameras.value = await fetchCameras()
+})
 
 </script>
 

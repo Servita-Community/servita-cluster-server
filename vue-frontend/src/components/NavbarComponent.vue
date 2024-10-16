@@ -63,18 +63,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, inject } from 'vue'
 import routes from '../routes'
-import { fetchCameras } from '../apiTools'
 
-const cameras = ref([])
+const cameras = inject('cameras')
 
 const leftDrawer = ref(false)
 const rightDrawer = ref(false)
 
-onMounted(async () => {
-  cameras.value = await fetchCameras()
-})
 </script>
 
 <style scoped>

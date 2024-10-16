@@ -26,10 +26,12 @@
 
 // Dumb data
 const fetchCameras = async () => {
-    return [
+    const cameras = [
         { index: 1, description: 'Front Door Camera', active: true, ip: '192.168.1.10' },
         { index: 2, description: 'Backyard Camera', active: false, ip: '192.168.1.11' },
+        { index: 3, description: 'Testing VCT Camera', active: true, ip: 'vct2-sector6' }
     ];
+    return cameras;
 }
 
 export { fetchCameras };
