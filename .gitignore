@@ -2,3 +2,4 @@ node_modules/
 backend/db.sqlite3
 *db.sqlite3*
 *pycache*
+vue-frontend/dist/
