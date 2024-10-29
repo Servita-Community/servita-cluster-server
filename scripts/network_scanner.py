@@ -23,29 +23,28 @@ def parse_arguments():
     return parser.parse_args()
 
 def is_device_online(ip_address, timeout):
-    """Check if the device at the specified IP responds to /status."""
+    """Check if the device at the specified IP responds with the expected JSON structure."""
     try:
         response = requests.get(f"http://{ip_address}/status", timeout=timeout)
-        if response.status_code == 200 and response.content:
-            return True
-    except requests.RequestException:
+        if response.status_code == 200:
+            data = response.json()
+            # Check for required keys in JSON response to confirm device validity
+            if all(key in data for key in ["ssid", "ip", "mac"]):
+                return data  # Return the JSON data if it matches expected structure
+    except (requests.RequestException, json.JSONDecodeError):
         pass
-    return False
+    return None
 
 def check_device(ip, timeout):
     """Check if a single IP address is a valid device and return device info if online."""
     ip_address = str(ip)
-    if is_device_online(ip_address, timeout):
-        # Get MAC address by sending an ARP request
-        try:
-            mac_address = get_mac_address(ip=ip_address)
-            return {"mac_address": mac_address, "ip_address": ip_address}
-        except Exception:
-            print(f"MAC address for {ip_address} could not be determined.")
+    device_data = is_device_online(ip_address, timeout)
+    if device_data:
+        return {"ssid": device_data["ssid"], "ip_address": device_data["ip"], "mac_address": device_data["mac"]}
     return None
 
 def scan_network(network_cidr, timeout, workers):
-    """Scan the network for devices responding at /status using multiple workers."""
+    """Scan the network for devices responding with valid JSON structure."""
     devices = []
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = {executor.submit(check_device, ip, timeout): ip for ip in ip_network(network_cidr).hosts()}
@@ -66,16 +65,6 @@ def send_scan_report(devices, api_endpoint):
         print("Scan report sent successfully.")
     except requests.RequestException as e:
         print(f"Failed to send scan report: {e}")
-
-def get_mac_address(ip):
-    """Retrieve the MAC address for a given IP (requires `arp-scan` to be installed)."""
-    import subprocess
-    result = subprocess.run(["arp", "-n", ip], capture_output=True, text=True)
-    lines = result.stdout.splitlines()
-    for line in lines:
-        if ip in line:
-            return line.split()[2]  # MAC address in arp output
-    return "unknown"
 
 def main():
     """Main loop to continuously scan the network."""
