@@ -33,43 +33,88 @@
       </v-list>
     </v-navigation-drawer>
 
+    <!-- Right Drawer for Device Statuses -->
     <v-navigation-drawer app v-model="rightDrawer" temporary location="right">
-      <v-expansion-panels>
-        <v-expansion-panel
-          v-for="camera in cameras"
-          :key="camera.index"
+      <v-list>
+        <v-list-item
+          v-for="device in devices"
+          :key="device.mac_address"
+          :href="'http://' + device.ip_address"
+          target="_blank"
+          style="text-decoration: none; color: inherit;"
         >
-          <v-expansion-panel-title>
-            <span class="text-h4 mr-4">{{ camera.index }}</span>
-            <span>{{ camera.description }}</span>
-            <v-spacer></v-spacer>
-            <v-icon :color="camera.active ? 'green' : 'red'">mdi-circle</v-icon>
-          </v-expansion-panel-title>
-
-          <v-expansion-panel-text>
-            <v-list>
-              <v-list-item
-                :href="'http://' + camera.ip"
-                prepend-icon="mdi-camera-wireless"
-              >
-                <v-list-item-title>View Camera Stream</v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-expansion-panel-text>
-        </v-expansion-panel>
-      </v-expansion-panels>
+          <template v-slot:prepend>
+            <v-icon :color="device.is_up ? 'green' : 'red'">mdi-circle</v-icon>
+          </template>
+          <v-list-item-content>
+            <v-list-item-title>{{ device.ip_address }}</v-list-item-title>
+            <v-list-item-subtitle>MAC: {{ device.mac_address }}</v-list-item-subtitle>
+            <v-list-item-subtitle>
+              {{ device.is_up ? 'Uptime: ' + device.uptime : 'Downtime: ' + device.downtime }}
+            </v-list-item-subtitle>
+          </v-list-item-content>
+        </v-list-item>
+      </v-list>
     </v-navigation-drawer>
   </v-container>
 </template>
 
 <script setup>
-import { ref, inject } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import axios from 'axios'
 import routes from '../routes'
-
-const cameras = inject('cameras')
 
 const leftDrawer = ref(false)
 const rightDrawer = ref(false)
+const devices = ref([])
+
+// Backend base URL based on current page origin
+const baseUrl = `${window.location.origin}/api/devices/statuses/`
+
+// Fetch device statuses from backend
+async function fetchDeviceStatuses() {
+  try {
+    const response = await axios.get(baseUrl)
+    devices.value = response.data.map(device => ({
+      ...device,
+      uptime: calculateUptime(device.initial_uptime),
+      downtime: calculateDowntime(device.last_seen)
+    }))
+  } catch (error) {
+    console.error('Error fetching device statuses:', error)
+  }
+}
+
+// Calculate uptime based on initial_uptime
+function calculateUptime(initialUptime) {
+  const uptimeDuration = Math.floor((new Date() - new Date(initialUptime)) / 1000)
+  return formatDuration(uptimeDuration)
+}
+
+// Calculate downtime based on last_seen
+function calculateDowntime(lastSeen) {
+  const downtimeDuration = Math.floor((new Date() - new Date(lastSeen)) / 1000)
+  return formatDuration(downtimeDuration)
+}
+
+// Format duration in hours, minutes, and seconds
+function formatDuration(seconds) {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = seconds % 60
+  return `${hours}h ${minutes}m ${secs}s`
+}
+
+// Set up a timer to refresh device statuses every 10 seconds
+let intervalId
+onMounted(() => {
+  fetchDeviceStatuses() // initial fetch
+  intervalId = setInterval(fetchDeviceStatuses, 10000) // fetch every 10 seconds
+})
+
+onUnmounted(() => {
+  clearInterval(intervalId) // clean up on unmount
+})
 
 </script>
 
