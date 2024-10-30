@@ -12,6 +12,7 @@ class PingLog(models.Model):
     mac_address = models.CharField(max_length=17)
     ip_address = models.GenericIPAddressField()
     location = models.CharField(max_length=100, blank=True)
+    version = models.CharField(max_length=100, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)  # Automatically set to ping time
 
     def __str__(self):
@@ -21,6 +22,7 @@ class DeviceStatus(models.Model):
     mac_address = models.CharField(max_length=17, unique=True)
     ip_address = models.GenericIPAddressField()
     location = models.CharField(max_length=100, blank=True)
+    version = models.CharField(max_length=100, blank=True)
     is_up = models.BooleanField(default=True)  # True if device is up, False if down
     last_seen = models.DateTimeField()  # Last up/down state change timestamp
     initial_uptime = models.DateTimeField(null=True, blank=True)  # When device first went up

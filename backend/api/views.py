@@ -27,11 +27,12 @@ def create_scan(request):
         mac_address = device.get('mac_address') or device.get('mac')
         ip_address = device.get('ip_address') or device.get('ip')
         location = device.get('location', '')  # Default to empty if location is not provided
+        version = device.get('version', '')  # Default to empty if version is not provided
 
         scanned_mac_addresses.add(mac_address)
 
         # Create PingLog entries for each device in the scan
-        PingLog.objects.create(scan=scan, mac_address=mac_address, ip_address=ip_address, location=location)
+        PingLog.objects.create(scan=scan, mac_address=mac_address, ip_address=ip_address, location=location, version=version)
 
         # Update DeviceStatus table: mark as up if found in scan
         device_status, created = DeviceStatus.objects.get_or_create(
@@ -39,6 +40,7 @@ def create_scan(request):
             defaults={
                 'ip_address': ip_address,
                 'location': location,
+                'version': version,
                 'is_up': True,
                 'initial_uptime': timezone.now(),
                 'last_seen': timezone.now(),
@@ -49,6 +51,7 @@ def create_scan(request):
             # Update existing device status
             device_status.ip_address = ip_address
             device_status.location = location
+            device_status.version = version
             # Only update last_seen if the device is being marked as up
             if not device_status.is_up:
                 device_status.initial_uptime = timezone.now()
@@ -80,6 +83,7 @@ def update_device_status(request, mac_address):
 
     is_up = request.data.get('is_up')
     location = request.data.get('location')
+    version = request.data.get('version')
 
     # Update the status and location if provided
     if is_up is not None:
@@ -90,6 +94,9 @@ def update_device_status(request, mac_address):
 
     if location is not None:
         device.location = location
+    
+    if version is not None:
+        device.version = version
 
     device.save()
     return Response({"message": "Device status updated"}, status=status.HTTP_200_OK)

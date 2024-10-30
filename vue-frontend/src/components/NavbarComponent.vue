@@ -55,6 +55,9 @@
             <v-list-item-subtitle v-if="device.location && device.location.length > 0">
               Location: {{ device.location }}
             </v-list-item-subtitle>
+            <v-list-item-subtitle v-if="device.version && device.version.length > 0">
+              Firmware: {{ device.version }}
+            </v-list-item-subtitle>
           </v-list-item-content>
         </v-list-item>
       </v-list>

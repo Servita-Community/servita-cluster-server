@@ -44,6 +44,7 @@ def check_device(ip, timeout):
             "ssid": device_data["ssid"],
             "ip_address": device_data["ip"],
             "mac_address": device_data["mac"],
+            "version": device_data.get("version", ""),
             "location": device_data.get("location", ""),
         }
     return None
