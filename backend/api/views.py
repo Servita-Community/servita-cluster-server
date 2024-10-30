@@ -24,27 +24,31 @@ def create_scan(request):
 
     # Process each device in the scan
     for device in devices:
-        mac_address = device.get('mac_address')
-        ip_address = device.get('ip_address')
+        mac_address = device.get('mac_address') or device.get('mac')
+        ip_address = device.get('ip_address') or device.get('ip')
+        location = device.get('location', '')  # Default to empty if location is not provided
+
         scanned_mac_addresses.add(mac_address)
 
         # Create PingLog entries for each device in the scan
-        PingLog.objects.create(scan=scan, mac_address=mac_address, ip_address=ip_address)
+        PingLog.objects.create(scan=scan, mac_address=mac_address, ip_address=ip_address, location=location)
 
         # Update DeviceStatus table: mark as up if found in scan
         device_status, created = DeviceStatus.objects.get_or_create(
             mac_address=mac_address,
             defaults={
                 'ip_address': ip_address,
+                'location': location,
                 'is_up': True,
                 'initial_uptime': timezone.now(),
                 'last_seen': timezone.now(),
             },
         )
-        
+
         if not created:
             # Update existing device status
             device_status.ip_address = ip_address
+            device_status.location = location
             # Only update last_seen if the device is being marked as up
             if not device_status.is_up:
                 device_status.initial_uptime = timezone.now()
@@ -66,22 +70,26 @@ def get_device_statuses(request):
     serializer = DeviceStatusSerializer(statuses, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
-
 @api_view(['PATCH'])
 def update_device_status(request, mac_address):
-    """Update the status of a device (up or down)."""
+    """Update the status of a device (up or down) and optionally the location."""
     try:
         device = DeviceStatus.objects.get(mac_address=mac_address)
     except DeviceStatus.DoesNotExist:
         return Response({"error": "Device not found"}, status=status.HTTP_404_NOT_FOUND)
 
     is_up = request.data.get('is_up')
+    location = request.data.get('location')
+
+    # Update the status and location if provided
     if is_up is not None:
         device.is_up = is_up
         device.last_seen = timezone.now()
         if is_up:
             device.initial_uptime = timezone.now() if not device.initial_uptime else device.initial_uptime
-        device.save()
-        return Response({"message": "Device status updated"}, status=status.HTTP_200_OK)
-    else:
-        return Response({"error": "is_up field is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    if location is not None:
+        device.location = location
+
+    device.save()
+    return Response({"message": "Device status updated"}, status=status.HTTP_200_OK)

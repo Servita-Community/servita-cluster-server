@@ -126,8 +126,12 @@ sudo systemctl daemon-reload
 echo "Enabling $SERVICE_NAME to start on boot..."
 sudo systemctl enable $SERVICE_NAME
 
-# Start the service immediately
-echo "Starting $SERVICE_NAME..."
+# Stop the service if it's already running
+echo "Stopping $SERVICE_NAME if currently running..."
+sudo systemctl stop $SERVICE_NAME
+
+# Start the service to apply the updated Python file
+echo "Starting $SERVICE_NAME with updated Python file..."
 sudo systemctl start $SERVICE_NAME
 
 echo "Service $SERVICE_NAME setup complete."

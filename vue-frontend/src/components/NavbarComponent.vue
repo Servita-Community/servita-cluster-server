@@ -52,6 +52,9 @@
             <v-list-item-subtitle>
               {{ device.is_up ? 'Uptime: ' + device.uptime : 'Downtime: ' + device.downtime }}
             </v-list-item-subtitle>
+            <v-list-item-subtitle v-if="device.location && device.location.length > 0">
+              Location: {{ device.location }}
+            </v-list-item-subtitle>
           </v-list-item-content>
         </v-list-item>
       </v-list>
@@ -78,7 +81,7 @@ async function fetchDeviceStatuses() {
     devices.value = response.data.map(device => ({
       ...device,
       uptime: calculateUptime(device.initial_uptime),
-      downtime: calculateDowntime(device.last_seen)
+      downtime: calculateDowntime(device.last_seen),
     }))
   } catch (error) {
     console.error('Error fetching device statuses:', error)

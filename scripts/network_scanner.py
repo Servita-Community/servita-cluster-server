@@ -40,7 +40,12 @@ def check_device(ip, timeout):
     ip_address = str(ip)
     device_data = is_device_online(ip_address, timeout)
     if device_data:
-        return {"ssid": device_data["ssid"], "ip_address": device_data["ip"], "mac_address": device_data["mac"]}
+        return {
+            "ssid": device_data["ssid"],
+            "ip_address": device_data["ip"],
+            "mac_address": device_data["mac"],
+            "location": device_data.get("location", ""),
+        }
     return None
 
 def scan_network(network_cidr, timeout, workers):
