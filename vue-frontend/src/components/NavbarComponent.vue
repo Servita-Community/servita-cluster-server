@@ -46,19 +46,18 @@
           <template v-slot:prepend>
             <v-icon :color="device.is_up ? 'green' : 'red'">mdi-circle</v-icon>
           </template>
-          <v-list-item-content>
-            <v-list-item-title>{{ device.ip_address }}</v-list-item-title>
-            <v-list-item-subtitle>MAC: {{ device.mac_address }}</v-list-item-subtitle>
-            <v-list-item-subtitle>
-              {{ device.is_up ? 'Uptime: ' + device.uptime : 'Downtime: ' + device.downtime }}
-            </v-list-item-subtitle>
-            <v-list-item-subtitle v-if="device.location && device.location.length > 0">
-              Location: {{ device.location }}
-            </v-list-item-subtitle>
-            <v-list-item-subtitle v-if="device.version && device.version.length > 0">
-              Firmware: {{ device.version }}
-            </v-list-item-subtitle>
-          </v-list-item-content>
+
+          <v-list-item-title>{{ device.ip_address }}</v-list-item-title>
+          <v-list-item-subtitle>MAC: {{ device.mac_address }}</v-list-item-subtitle>
+          <v-list-item-subtitle>
+            {{ device.is_up ? 'Uptime: ' + device.uptime : 'Downtime: ' + device.downtime }}
+          </v-list-item-subtitle>
+          <v-list-item-subtitle v-if="device.location && device.location.length > 0">
+            Location: {{ device.location }}
+          </v-list-item-subtitle>
+          <v-list-item-subtitle v-if="device.version && device.version.length > 0">
+            Firmware: {{ device.version }}
+          </v-list-item-subtitle>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
@@ -75,7 +74,7 @@ const rightDrawer = ref(false)
 const devices = ref([])
 
 // Backend base URL based on current page origin
-const baseUrl = `${window.location.origin}/api/devices/statuses/`
+const baseUrl = `http://${window.location.hostname}:${window.location.port}/api/devices/statuses/`
 
 // Fetch device statuses from backend
 async function fetchDeviceStatuses() {
