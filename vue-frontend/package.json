@@ -4,13 +4,16 @@
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
+    "build": "vue-cli-service build --dest ../backend/static/dist",
+    "build:watch": "vue-cli-service build --watch --dest ../backend/static/dist",
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
     "@mdi/font": "5.9.55",
     "axios": "^1.7.7",
     "core-js": "^3.8.3",
+    "exports-loader": "^5.0.0",
+    "janus-gateway": "^1.2.4",
     "roboto-fontface": "*",
     "vue": "^3.5.9",
     "vue-router": "^4.4.5",
