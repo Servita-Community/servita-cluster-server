@@ -8,9 +8,12 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10"
-django = "^5.1.2"
+django = "4.2"
 djangorestframework = "^3.15.2"
 requests = "^2.32.3"
+django-livereload-server = "^0.5.1"
+django-browser-reload = "^1.17.0"
+django-cors-headers = "^4.6.0"
 
 
 [build-system]
