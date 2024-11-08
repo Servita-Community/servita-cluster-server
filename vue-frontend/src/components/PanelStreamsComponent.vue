@@ -45,9 +45,9 @@
 
     <!-- Stream Video Display -->
     <v-row dense class="justify-center">
-      <transition-group name="fade" mode="out-in">
+      <transition-group name="fade">
         <v-col
-          v-for="(stream, index) in filteredStreams"
+          v-for="(stream, index) in streams"
           :key="stream.mac_address"
           :cols="enlargedStreamIndex === index ? '6' : streamSize"
           :style="{ transition: 'all 0.3s ease' }"
@@ -81,7 +81,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { Janus } from 'janus-gateway'
 
@@ -130,9 +130,6 @@ const fetchStreams = async () => {
   }
 }
 
-// Limit to 4 streams for display
-const filteredStreams = computed(() => streams.value.slice(0, 4))
-
 // Initialize Janus
 const startJanus = () => {
   Janus.init({
@@ -145,7 +142,7 @@ const startJanus = () => {
 // Create a new Janus session
 const createSession = () => {
   janus.value = new Janus({
-    server: 'ws://heimdall-64gb-14.local:8188/', // Replace with your Janus server
+    server: 'ws://heimdall-64gb-16.local:8188/', // Replace with your Janus server
     success: attachPlugins,
     error: (error) => console.error('Error creating Janus session:', error),
     destroyed: () => console.log('Janus session destroyed'),
@@ -154,7 +151,7 @@ const createSession = () => {
 
 // Attach plugins for each selected stream
 const attachPlugins = () => {
-  const streamIds = [5002, 5000, 5001, 5003] // Replace with actual stream IDs for each selected stream
+  const streamIds = [5001, 5000, 5002, 5003, 5004, 5005, 5006, 5007] // Replace with actual stream IDs for each selected stream
 
   selectedStreams.value.forEach((_, index) => {
     const streamId = streamIds[index % streamIds.length] // Adjust stream IDs as necessary
@@ -183,6 +180,7 @@ const attachPlugins = () => {
       onremotetrack: (track, _mid, added) => {
         if (track.kind === 'video' && added) {
           const videoElement = document.getElementById(`video${index}`)
+          videoElement.addEventListener('click', (e) => e.preventDefault() )
           if (videoElement) {
             const stream = new MediaStream()
             stream.addTrack(track.clone())
