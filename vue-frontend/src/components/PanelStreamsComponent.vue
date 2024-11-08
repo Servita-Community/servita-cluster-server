@@ -1,13 +1,13 @@
 <template>
-  <v-container fluid :style="{ transition: 'width 0.3s ease, height 0.3s ease'}">
+  <v-container fluid>
     <!-- Stream Select Controls -->
     <v-expansion-panels>
-      <v-expansion-panel title="Panel Controls" justify="center" :style="{ maxWidth: '600px' }" class="mx-auto">
+      <v-expansion-panel title="Panel Controls" :style="{ maxWidth: '600px' }" class="mx-auto">
         <v-expansion-panel-text>
           <v-card flat :loading="isLoading" justify="center" :style="{ maxWidth: '600px' }" class="mx-auto">
             <v-card-text class="text-center pt-6">
               <v-card-actions class="d-flex justify-center">
-                <v-slider v-model="streamSize" :max="6" :min="1" :step="1" thumb-label="always" class="mr-2" hide-details />
+                <v-slider v-model="streamSize" :max="5" :min="1" :step="1" thumb-label="always" class="mr-2" hide-details />
                 <v-divider vertical class="mx-2"></v-divider>
                 <v-btn :color="isLedOn ? 'green' : isLoading ? 'blue' : 'red'" class="mr-2">
                   <v-icon v-if="isLedOn">mdi-led-on</v-icon>
@@ -41,25 +41,24 @@
       </v-expansion-panel>
     </v-expansion-panels>
 
-    <v-divider class="mt-4" />
+    <v-divider class="my-4" />
 
     <!-- Stream Video Display -->
-    <v-container fluid :style="{ transition: 'width 0.3s ease, height 0.3s ease'}">
-      <v-row dense>
-        <v-col 
-          :cols="streamSize" 
-          v-for="(stream, index) in filteredStreams" 
+    <v-row dense class="justify-center">
+      <transition-group name="fade" mode="out-in">
+        <v-col
+          v-for="(stream, index) in filteredStreams"
           :key="stream.mac_address"
-          :style="{ transition: 'width 0.3s ease, height 0.3s ease' }"
+          :cols="enlargedStreamIndex === index ? '6' : streamSize"
+          :style="{ transition: 'all 0.3s ease' }"
         >
           <v-tooltip :text="stream.location">
             <template v-slot:activator="{ props }">
               <v-card
                 v-if="isStreaming && selectedStreams.includes(stream.mac_address)"
-                dense
                 v-bind="props"
+                dense
                 class="pa-1"
-                :style="getVideoStyle(index)"
                 @click="toggleEnlargeStream(index)"
               >
                 <v-card-text class="pa-1">
@@ -76,14 +75,13 @@
             </template>
           </v-tooltip>
         </v-col>
-      </v-row>
-    </v-container>
+      </transition-group>
+    </v-row>
   </v-container>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { setInterval } from 'core-js';
 import axios from 'axios'
 import { Janus } from 'janus-gateway'
 
@@ -97,30 +95,9 @@ const janus = ref(null)
 const pluginHandles = ref([]) // Store plugin handles for each Janus stream
 const janusRunning = ref(false)
 const enlargedStreamIndex = ref(null) // Index of the stream to enlarge
-const streamAspectRatios = ref({})
-
-const getVideoStyle = (index) => {
-  const isEnlarged = enlargedStreamIndex.value === index
-  const aspectRatio = streamAspectRatios.value[index] || 1.78 // Default to 16:9 if not calculated
-
-  return {
-    width: isEnlarged ? `calc(80vh * ${aspectRatio})` : '100%',
-    height: isEnlarged ? '80vh' : 'auto',
-    'object-fit': 'contain',
-    zIndex: isEnlarged ? 10 : 0,
-    'box-shadow': isEnlarged ? '0 8px 16px rgba(0, 0, 0, 0.3)' : 'none',
-    transition: 'width 0.3s ease, height 0.3s ease, zIndex 0.3s ease-in',
-  }
-}
 
 // Update aspect ratio when a stream is clicked
 const toggleEnlargeStream = (index) => {
-  if (enlargedStreamIndex.value !== index) {
-    const videoElement = document.getElementById(`video${index}`)
-    if (videoElement && videoElement.videoWidth && videoElement.videoHeight) {
-      streamAspectRatios.value[index] = videoElement.videoWidth / videoElement.videoHeight
-    }
-  }
   enlargedStreamIndex.value = enlargedStreamIndex.value === index ? null : index
 }
 
@@ -268,5 +245,10 @@ setInterval(fetchStreams, 10000)
 </script>
 
 <style scoped>
-
+.fade-enter-active, .fade-leave-active {
+  transition: all 0.3s ease;
+}
+.fade-enter, .fade-leave-to /* .fade-leave-active in <2.1.8 */ {
+  opacity: 0;
+}
 </style>
