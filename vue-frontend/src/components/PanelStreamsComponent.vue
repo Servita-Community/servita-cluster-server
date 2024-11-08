@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid>
+  <v-container fluid :style="{ transition: 'width 0.3s ease, height 0.3s ease'}">
     <!-- Stream Select Controls -->
     <v-expansion-panels>
       <v-expansion-panel title="Panel Controls" justify="center" :style="{ maxWidth: '600px' }" class="mx-auto">
@@ -44,13 +44,13 @@
     <v-divider class="mt-4" />
 
     <!-- Stream Video Display -->
-    <v-container fluid>
+    <v-container fluid :style="{ transition: 'width 0.3s ease, height 0.3s ease'}">
       <v-row dense>
         <v-col 
-          :cols="enlargedStreamIndex === index ? streamSize * 2 : streamSize" 
+          :cols="streamSize" 
           v-for="(stream, index) in filteredStreams" 
           :key="stream.mac_address"
-          class="transition-col"
+          :style="{ transition: 'width 0.3s ease, height 0.3s ease' }"
         >
           <v-tooltip :text="stream.location">
             <template v-slot:activator="{ props }">
@@ -59,7 +59,7 @@
                 dense
                 v-bind="props"
                 class="pa-1"
-                :class="{ 'enlarged-stream': enlargedStreamIndex === index }"
+                :style="getVideoStyle(index)"
                 @click="toggleEnlargeStream(index)"
               >
                 <v-card-text class="pa-1">
@@ -68,7 +68,8 @@
                     :id="`video${index}`"
                     autoplay
                     controls
-                    style="width: 100%; height: auto;"
+                    width="100%"
+                    height="100%"
                   ></video>
                 </v-card-text>
               </v-card>
@@ -82,6 +83,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { setInterval } from 'core-js';
 import axios from 'axios'
 import { Janus } from 'janus-gateway'
 
@@ -95,6 +97,32 @@ const janus = ref(null)
 const pluginHandles = ref([]) // Store plugin handles for each Janus stream
 const janusRunning = ref(false)
 const enlargedStreamIndex = ref(null) // Index of the stream to enlarge
+const streamAspectRatios = ref({})
+
+const getVideoStyle = (index) => {
+  const isEnlarged = enlargedStreamIndex.value === index
+  const aspectRatio = streamAspectRatios.value[index] || 1.78 // Default to 16:9 if not calculated
+
+  return {
+    width: isEnlarged ? `calc(80vh * ${aspectRatio})` : '100%',
+    height: isEnlarged ? '80vh' : 'auto',
+    'object-fit': 'contain',
+    zIndex: isEnlarged ? 10 : 0,
+    'box-shadow': isEnlarged ? '0 8px 16px rgba(0, 0, 0, 0.3)' : 'none',
+    transition: 'width 0.3s ease, height 0.3s ease, zIndex 0.3s ease-in',
+  }
+}
+
+// Update aspect ratio when a stream is clicked
+const toggleEnlargeStream = (index) => {
+  if (enlargedStreamIndex.value !== index) {
+    const videoElement = document.getElementById(`video${index}`)
+    if (videoElement && videoElement.videoWidth && videoElement.videoHeight) {
+      streamAspectRatios.value[index] = videoElement.videoWidth / videoElement.videoHeight
+    }
+  }
+  enlargedStreamIndex.value = enlargedStreamIndex.value === index ? null : index
+}
 
 // Toggle selection for a stream
 const toggleSelectedStream = (macAddress) => {
@@ -235,22 +263,10 @@ const stopJanus = () => {
   janusRunning.value = false
 }
 
-// Toggle enlarged stream view
-const toggleEnlargeStream = (index) => {
-  enlargedStreamIndex.value = enlargedStreamIndex.value === index ? null : index
-}
-
 onMounted(fetchStreams)
+setInterval(fetchStreams, 10000)
 </script>
 
 <style scoped>
-.enlarged-stream {
-  transition: all 0.3s ease;
-  transform: scale(1.5); /* Adjust the scaling to make it larger */
-  z-index: 10;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-}
-.transition-col {
-  transition: width 0.3s ease;
-}
+
 </style>
