@@ -5,20 +5,20 @@
       <v-expansion-panel title="Panel Controls" :style="{ maxWidth: '600px' }" class="mx-auto">
         <v-expansion-panel-text>
           <v-card flat :loading="isLoading" justify="center" :style="{ maxWidth: '600px' }" class="mx-auto">
-            <v-card-text class="text-center pt-6">
+            <v-card-text class="text-center pt-8">
               <v-card-actions class="d-flex justify-center">
-                <v-slider v-model="streamSize" :max="5" :min="1" :step="1" thumb-label="always" class="mr-2" hide-details />
+                <v-slider v-model="streamSize" :max="5" :min="1" :step="1" thumb-label="always" class="mr-2" :style="{minWidth: '100px'}" hide-details />
                 <v-divider vertical class="mx-2"></v-divider>
                 <v-btn :color="isLedOn ? 'green' : isLoading ? 'blue' : 'red'" class="mr-2">
                   <v-icon v-if="isLedOn">mdi-led-on</v-icon>
                   <v-icon v-else-if="isLoading" class="mdi-spin">mdi-loading</v-icon>
                   <v-icon v-else>mdi-led-off</v-icon>
-                  <span v-if="isLedOn">Streaming</span>
-                  <span v-else-if="isLoading">Loading...</span>
-                  <span v-else>Stream Off</span>
+                  <span v-if="isLedOn">Good</span>
+                  <span v-else-if="isLoading" />
+                  <span v-else>Off</span>
                 </v-btn>
                 <v-btn color="primary" @click="toggleStream">
-                  {{ isStreaming ? 'Stop Stream' : 'Start Stream' }}
+                  {{ isStreaming ? 'Stop' : 'Start' }}
                 </v-btn>
               </v-card-actions>
             </v-card-text>
@@ -44,7 +44,7 @@
     <v-divider class="my-4" />
 
     <!-- Stream Video Display -->
-    <v-row dense class="justify-center">
+    <v-row dense>
       <transition-group name="fade">
         <v-col
           v-for="(stream, index) in streams"
@@ -61,7 +61,7 @@
                 class="pa-1"
                 @click="toggleEnlargeStream(index)"
               >
-                <v-card-text class="pa-1">
+                <v-card-text class="pa-1 text-centered">
                   <video
                     v-if="isStreaming && selectedStreams.includes(stream.mac_address)"
                     :id="`video${index}`"
