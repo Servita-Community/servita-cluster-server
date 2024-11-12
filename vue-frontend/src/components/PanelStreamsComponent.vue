@@ -151,6 +151,11 @@ const createSession = () => {
 
 // Attach plugins for each selected stream
 const attachPlugins = () => {
+  /**
+   * TODO: Replace with code to get streamIds from the backend Janus server (which will be ran on localhost).
+   * 
+   * Either a get request to an API endpoint that returns active streams or Janus itself can be used to get the stream IDs.
+   */
   const streamIds = [5001, 5000, 5002, 5003, 5004, 5005, 5006, 5007] // Replace with actual stream IDs for each selected stream
 
   selectedStreams.value.forEach((_, index) => {
