@@ -7,7 +7,7 @@
           <v-card flat :loading="isLoading" justify="center" :style="{ maxWidth: '600px' }" class="mx-auto">
             <v-card-text class="text-center pt-8">
               <v-card-actions class="d-flex justify-center">
-                <v-slider v-model="streamSize" :max="5" :min="1" :step="1" thumb-label="always" class="mr-2" :style="{minWidth: '100px'}" hide-details />
+                <v-slider v-model="streamSize" :max="6" :min="1" :step="1" thumb-label="always" class="mr-2" :style="{minWidth: '100px'}" hide-details />
                 <v-divider vertical class="mx-2"></v-divider>
                 <v-btn :color="isLedOn ? 'green' : isLoading ? 'blue' : 'red'" class="mr-2">
                   <v-icon v-if="isLedOn">mdi-led-on</v-icon>
