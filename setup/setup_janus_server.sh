@@ -89,15 +89,14 @@ EOF
 
 # Define the systemd service content with passed arguments
 SERVICE_CONTENT="[Unit]
-Description=Network Scanner Service
+Description=Update Janus Service
 After=network.target
 
 [Service]
 ExecStart=$POETRY_PATH run python3 $target_dir/ubivision-cluster-server/scripts/update_janus.py \\
-  --api_endpoint http://$api_ip:$api_port/api/devices/statuses/ \\
-  --scan_interval $scan_interval \\
+    --api_endpoint http://$api_ip:$api_port/api/devices/statuses/ \\
+    --scan_interval $scan_interval
 WorkingDirectory=$target_dir/ubivision-cluster-server/scripts
-Environment=$target_dir/ubivision-cluster-server/scripts
 Restart=always
 User=$user
 
@@ -105,11 +104,13 @@ User=$user
 WantedBy=multi-user.target
 "
 
+echo $SERVICE_CONTENT
+
 SERVICE_NAME="update-janus"
 SERVICE_PATH="/etc/systemd/system/$SERVICE_NAME.service"
 
 # Create the service file
-echo "Creating systemd service file for Network Scanner with the following settings:"
+echo "Creating systemd service file for Janus updater with the following settings:"
 echo "  API Endpoint: http://$api_ip:$api_port/api/devices/statuses/"
 echo "  Scan Interval: $scan_interval seconds"
 ssh "$user@$host" <<EOF

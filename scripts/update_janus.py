@@ -2,7 +2,10 @@ import requests
 import json
 import time
 import argparse
+import logging
+import subprocess
 
+logging.basicConfig(level=logging.INFO)
 
 def parse_arguments():
     """Parse command-line arguments for configuration variables."""
@@ -28,9 +31,10 @@ def get_devices(api_endpoint):
 
 def update_janus_server(on_devices):
     """Update the Janus server with the new device status."""
-    print("Updating Janus server...")
+    logging.info("Updating Janus server...")
     
-    with open("../janus/janus.plugin.streaming.jcfg.template", "r") as f:
+    # Update the Janus configuration file
+    with open("../janus/janus.plugin.streaming.jcfg", "r") as f:
         lines = f.readlines()
     
     general_idx = next((i for i, line in enumerate(lines) if line.strip() == "general: {"), None)
@@ -42,6 +46,7 @@ def update_janus_server(on_devices):
 
     # Add new device entries
     ports_to_expose = set()
+    new_stream_configs = []
     for idx, device in enumerate(on_devices):
         port = 5000 + idx
         ports_to_expose.add(port)
@@ -58,11 +63,14 @@ def update_janus_server(on_devices):
                 secret = "adminpwd"
             }}
             """
-        lines.append(stream_config)
+        new_stream_configs.append(stream_config)
+    
+    lines = lines[:general_idx + 1] + new_stream_configs + lines[closing_brace_idx:]
 
     with open("../janus/janus.plugin.streaming.jcfg", "w") as f:
         f.writelines(lines)
     
+    # Update the Dockerfile
     with open("../janus/Dockerfile", "r") as f:
         lines = f.readlines()
     expose_line_idx = next((i for i, line in enumerate(lines) if line.startswith("EXPOSE ")), None)
@@ -71,7 +79,7 @@ def update_janus_server(on_devices):
         lines = lines[:expose_line_idx] + lines[expose_line_idx + 1:]
     else:
         used_ports = set()
-    print(f"Used ports: {used_ports}")
+    logging.info(f"Used ports: {used_ports}")
 
     used_ports.update(ports_to_expose)
     expose_line = f"EXPOSE {' '.join(map(str, sorted(used_ports)))}\n"
@@ -80,21 +88,35 @@ def update_janus_server(on_devices):
     with open("../janus/Dockerfile", "w") as f:
         f.writelines(lines)
 
+    # Restart the Docker container
+    try:
+        logging.info("Restarting the Docker container to apply changes...")
+        subprocess.run(["sudo", "docker", "stop", "ubivision-janus-server"], check=True)
+        subprocess.run(["sudo", "docker", "rm", "ubivision-janus-server"], check=True)
+        subprocess.run([
+            "sudo", "docker", "run", "-d", "--name", "ubivision-janus-server",
+            "--restart", "unless-stopped", "--network", "host", "ubivision-janus-image", "/opt/janus/bin/janus"
+        ], check=True)
+        logging.info("Docker container restarted successfully.")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error restarting Docker container: {e}")
+
 def main():
     """Main loop to continuously scan the network."""
     args = parse_arguments()
-    print(f"Starting network scanner with the following configuration:\n"
-          f"API Endpoint: {args.api_endpoint}\n"
-          f"Scan Interval: {args.scan_interval} seconds\n")
+    logging.info(f"Starting network scanner with the following configuration:\n"
+                 f"API Endpoint: {args.api_endpoint}\n"
+                 f"Scan Interval: {args.scan_interval} seconds\n")
 
     previous_on_devices = []
     while True:
-        print("Starting network scan...")
+        logging.info("Starting network scan...")
         devices = get_devices(args.api_endpoint)
         if devices is None:
-            print("Error getting devices from the cluster server.")
+            logging.error("Error getting devices from the cluster server.")
             time.sleep(args.scan_interval)
-        print(f"Found {len(devices)} devices.")
+            continue
+        logging.info(f"Found {len(devices)} devices.")
         on_devices = [device for device in devices if device["is_up"]]
         
         for device in on_devices:

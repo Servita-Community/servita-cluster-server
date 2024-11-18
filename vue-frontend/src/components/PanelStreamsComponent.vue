@@ -138,26 +138,42 @@ const startJanus = () => {
     callback: createSession,
   })
 }
-
 // Create a new Janus session
 const createSession = () => {
   janus.value = new Janus({
-    server: 'ws://heimdall-64gb-16.local:8188/', // Replace with your Janus server
-    success: attachPlugins,
+    server: `ws://${window.location.hostname}:8188/`, // Replace with your Janus server
+    success: fetchStreamIds, // Fetch stream IDs after session creation
     error: (error) => console.error('Error creating Janus session:', error),
     destroyed: () => console.log('Janus session destroyed'),
   })
 }
 
-// Attach plugins for each selected stream
-const attachPlugins = () => {
-  /**
-   * TODO: Replace with code to get streamIds from the backend Janus server (which will be ran on localhost).
-   * 
-   * Either a get request to an API endpoint that returns active streams or Janus itself can be used to get the stream IDs.
-   */
-  const streamIds = [5001, 5000, 5002, 5003, 5004, 5005, 5006, 5007] // Replace with actual stream IDs for each selected stream
+// Fetch available stream IDs from the Janus server
+const fetchStreamIds = () => {
+  janus.value.attach({
+    plugin: 'janus.plugin.streaming',
+    success: (pluginHandle) => {
+      pluginHandle.send({
+        message: { request: 'list' },
+        success: (response) => {
+          const streamsData = response.list || []
+          console.log('Available Streams:', response)
 
+          // Map stream IDs for user selection
+          const streamIds = streamsData.map((stream) => stream.id)
+          attachPlugins(streamIds) // Pass the stream IDs to attachPlugins
+        },
+        error: (error) => {
+          console.error('Error fetching streams:', error)
+        },
+      })
+    },
+    error: (error) => console.error('Error attaching streaming plugin:', error),
+  })
+}
+
+// Attach plugins for each selected stream
+const attachPlugins = (streamIds) => {
   selectedStreams.value.forEach((_, index) => {
     const streamId = streamIds[index % streamIds.length] // Adjust stream IDs as necessary
 
@@ -199,6 +215,7 @@ const attachPlugins = () => {
     })
   })
 }
+
 
 // Start or stop streaming for all selected streams
 const toggleStream = async () => {
