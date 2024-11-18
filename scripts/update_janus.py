@@ -36,7 +36,9 @@ def update_janus_server(on_devices):
     general_idx = next((i for i, line in enumerate(lines) if line.strip() == "general: {"), None)
     # Remove existing device entries
     if general_idx is not None:
-        lines = lines[:general_idx + 1] + [line for line in lines[general_idx + 1:] if not line.strip().startswith("udp-stream")]
+        closing_brace_idx = next((i for i, line in enumerate(lines[general_idx + 1:], start=general_idx + 1) if line.strip() == "}"), None)
+        if closing_brace_idx is not None:
+            lines = lines[:general_idx + 1] + [line for line in lines[general_idx + 1:closing_brace_idx] if not line.strip().startswith("udp-stream")] + lines[closing_brace_idx:]
 
     # Add new device entries
     ports_to_expose = set()

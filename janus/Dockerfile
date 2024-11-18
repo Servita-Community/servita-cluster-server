@@ -66,10 +66,10 @@ COPY janus.plugin.streaming.jcfg.template /opt/janus/etc/janus/janus.plugin.stre
 RUN sed -i -E 's/^(\s*)#?(full_trickle\s*=\s*).*/\1\2true/' /opt/janus/etc/janus/janus.jcfg
 
 # Expose Janus Gateway ports (if needed)
-EXPOSE 5000 5001
 
 RUN apt-get install -y tcpdump
 
 # Set up the entry point to start Janus Gateway
 ENTRYPOINT ["/opt/janus/bin/janus"]
 
+EXPOSE 5000 5001
