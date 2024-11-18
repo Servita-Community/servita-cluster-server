@@ -25,10 +25,11 @@
             <v-card-actions class="d-flex justify-center">
               <v-responsive class="overflow-y-auto" max-height="280">
                 <v-chip-group multiple column>
+                  {{ console.log(selectedStreams) }}
                   <v-chip
                     v-for="stream in streams"
                     :key="stream.mac_address"
-                    :color="selectedStreams.includes(stream.mac_address) ? 'info' : 'grey'"
+                    :color="selectedStreams.includes(stream.mac_address) ? 'info' : 'grey lighten-1'"
                     @click="toggleSelectedStream(stream.mac_address)"
                   >
                     {{ stream.location }}
