@@ -23,5 +23,5 @@ urlpatterns = [
     path('api/', include('api.urls')),  # Include API app URLs
     path('', views.frontend, name='frontend'),  # Serve Vue's index.html
     path('__reload__/', include("django_browser_reload.urls")),
-        re_path(r"^(?:.*)/?$", views.frontend, name='frontend'),  # Catch all other URLs
+    re_path(r"^(?:.*)/?$", views.frontend, name='frontend'),  # Catch all other URLs
 ]

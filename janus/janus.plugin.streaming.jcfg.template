@@ -1,0 +1,25 @@
+general: {
+}
+
+udp-stream0: {
+    type = "rtp"
+    id = 5000
+    description = "Location: 1.8, port: 5000"
+    audio = false
+    video = true
+    videoport = 5000
+    videopt = 96
+    videocodec = "h264"
+    secret = "adminpwd"
+}
+udp-stream1: {
+    type = "rtp"
+    id = 5001
+    description = "Location: 1.12, port: 5001"
+    audio = false
+    video = true
+    videoport = 5001
+    videopt = 96
+    videocodec = "h264"
+    secret = "adminpwd"
+}
