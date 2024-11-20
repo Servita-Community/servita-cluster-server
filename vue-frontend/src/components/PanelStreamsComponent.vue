@@ -130,23 +130,48 @@ const fetchStreams = async () => {
   }
 }
 
-// Initialize Janus
 const startJanus = () => {
-  Janus.init({
-    debug: 'all',
-    dependencies: Janus.useDefaultDependencies(),
-    callback: createSession,
-  })
-}
-// Create a new Janus session
+  if (!Janus.isWebrtcSupported()) {
+    console.error('No WebRTC support... ');
+    return;
+  }
+
+  if (!Janus.isInitialized()) {
+    Janus.init({
+      debug: 'all',
+      dependencies: Janus.useDefaultDependencies(),
+      callback: createSession,
+    });
+  } else {
+    createSession();
+  }
+};
+
 const createSession = () => {
   janus.value = new Janus({
-    server: `ws://${window.location.hostname}:8188/`, // Replace with your Janus server
-    success: fetchStreamIds, // Fetch stream IDs after session creation
-    error: (error) => console.error('Error creating Janus session:', error),
-    destroyed: () => console.log('Janus session destroyed'),
-  })
-}
+    server: `ws://${window.location.hostname}:8188/`,
+    success: () => {
+      console.log('Janus session established');
+      fetchStreamIds();
+    },
+    error: (cause) => {
+      console.error('Error creating Janus session', cause);
+      // Attempt to reconnect after a delay
+      setTimeout(() => {
+        console.log('Attempting to reconnect to Janus server...');
+        createSession();
+      }, 2000); // Retry after 2 seconds
+    },
+    destroyed: () => {
+      console.log('Janus session destroyed');
+      // Attempt to recreate the session
+      setTimeout(() => {
+        console.log('Recreating Janus session...');
+        createSession();
+      }, 2000);
+    },
+  });
+};
 
 // Fetch available stream IDs from the Janus server
 const fetchStreamIds = () => {
@@ -156,66 +181,82 @@ const fetchStreamIds = () => {
       pluginHandle.send({
         message: { request: 'list' },
         success: (response) => {
-          const streamsData = response.list || []
-          console.log('Available Streams:', response)
+          const streamsData = response.list || [];
+          console.log('Available Streams:', response);
 
           // Map stream IDs for user selection
-          const streamIds = streamsData.map((stream) => stream.id)
-          attachPlugins(streamIds) // Pass the stream IDs to attachPlugins
+          const streamIds = streamsData.map((stream) => stream.id);
+          attachPlugins(streamIds); // Pass the stream IDs to attachPlugins
         },
         error: (error) => {
-          console.error('Error fetching streams:', error)
+          console.error('Error fetching streams:', error);
+          // Attempt to refetch after a delay
+          setTimeout(fetchStreamIds, 2000);
         },
-      })
+      });
     },
-    error: (error) => console.error('Error attaching streaming plugin:', error),
-  })
-}
+    error: (error) => {
+      console.error('Error attaching streaming plugin:', error);
+      // Attempt to reattach after a delay
+      setTimeout(fetchStreamIds, 2000);
+    },
+  });
+};
 
 // Attach plugins for each selected stream
 const attachPlugins = (streamIds) => {
+  pluginHandles.value = []; // Reset plugin handles
   selectedStreams.value.forEach((_, index) => {
-    const streamId = streamIds[index % streamIds.length] // Adjust stream IDs as necessary
+    const streamId = streamIds[index % streamIds.length]; // Adjust stream IDs as necessary
 
     janus.value.attach({
       plugin: 'janus.plugin.streaming',
       success: (handle) => {
-        pluginHandles.value[index] = handle
-        console.log('Plugin attached:', handle)
-        pluginHandles.value[index].send({ message: { request: 'watch', id: streamId } })
-        janusRunning.value = true
+        pluginHandles.value[index] = handle;
+        console.log('Plugin attached:', handle);
+        handle.send({ message: { request: 'watch', id: streamId } });
       },
-      error: (error) => console.error('Error attaching plugin:', error),
+      error: (error) => {
+        console.error('Error attaching plugin:', error);
+        // Handle plugin error, perhaps try to reattach after a delay
+      },
       onmessage: (_msg, jsep) => {
         if (jsep) {
           pluginHandles.value[index].createAnswer({
             jsep: jsep,
             media: { audioSend: false, videoSend: false },
             success: (ourJsep) => {
-              pluginHandles.value[index].send({ message: { request: 'start' }, jsep: ourJsep })
+              pluginHandles.value[index].send({ message: { request: 'start' }, jsep: ourJsep });
             },
-            error: (error) => console.error('WebRTC error:', error),
-          })
+            error: (error) => {
+              console.error('WebRTC error:', error);
+              // Handle WebRTC error, possibly attempt to reattach
+            },
+          });
         }
       },
       onremotetrack: (track, _mid, added) => {
         if (track.kind === 'video' && added) {
-          const videoElement = document.getElementById(`video${index}`)
-          videoElement.addEventListener('click', (e) => e.preventDefault() )
+          const videoElement = document.getElementById(`video${index}`);
           if (videoElement) {
-            const stream = new MediaStream()
-            stream.addTrack(track.clone())
-            videoElement.srcObject = stream
+            const stream = new MediaStream();
+            stream.addTrack(track.clone());
+            videoElement.srcObject = stream;
           } else {
-            console.error(`Video element with id video${index} not found`)
+            console.error(`Video element with id video${index} not found`);
           }
         }
       },
-      oncleanup: () => console.log('Plugin cleaned up'),
-    })
-  })
-}
-
+      oncleanup: () => {
+        console.log('Plugin cleaned up');
+      },
+      ondetached: () => {
+        console.log('Plugin detached');
+        // Handle plugin detachment, possibly reattach
+      },
+    });
+  });
+};
 
 // Start or stop streaming for all selected streams
 const toggleStream = async () => {
