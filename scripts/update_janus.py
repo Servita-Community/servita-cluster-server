@@ -144,18 +144,20 @@ def update_janus_server(on_devices, janus_url):
 
     desired_streams = {}
     for idx, device in enumerate(on_devices):
-        port = 5000 + idx
-        stream_id = port
+        stream_id = 5000 + idx
         desired_streams[stream_id] = {
-            "type": "rtp",
+            "type": "rtsp",
             "id": stream_id,
-            "description": f"Location: {device['location']}, port: {port}",
+            "description": f"Location: {device['location']}",
             "audio": False,
             "video": True,
-            "videoport": port,
-            "videopt": 96,
+            "url": f"rtsp://{device['ip_address']}:554/",
             "videocodec": "h264",
             "secret": "adminpwd",
+            "rtsp_reconnect_delay": 5,
+            "rtsp_session_timeout": 0,
+            "rtsp_timeout": 10,
+            "rtsp_conn_timeout": 5,
         }
 
     # Streams to add and remove
