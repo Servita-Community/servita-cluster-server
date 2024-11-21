@@ -26,6 +26,16 @@ class DeviceStatus(models.Model):
     is_up = models.BooleanField(default=True)  # True if device is up, False if down
     last_seen = models.DateTimeField()  # Last up/down state change timestamp
     initial_uptime = models.DateTimeField(null=True, blank=True)  # When device first went up
+    ffmpeg_pid = models.IntegerField(null=True, blank=True)  # PID of ffmpeg process for this device
+    ffmpeg_start_time = models.DateTimeField(null=True, blank=True)  # When ffmpeg process started
+    stream_id = models.IntegerField(null=True, blank=True)  # Janus stream ID for this device
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['stream_id'], name='unique_stream_id', condition=models.Q(stream_id__isnull=False)
+            ),
+        ]
 
     def __str__(self):
         status = "Up" if self.is_up else "Down"
