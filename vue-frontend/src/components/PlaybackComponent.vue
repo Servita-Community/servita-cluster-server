@@ -1,5 +1,30 @@
 <template>
   <v-container fluid>
+
+    <!-- API Alerts -->
+    <v-row justify="center">
+      <v-col cols="12" md="8" lg="6">
+        <v-alert
+          v-if="apiSuccessMessage"
+          type="success"
+          dismissible
+          @input="apiSuccessMessage = ''"
+          class="mb-4"
+        >
+          {{ apiSuccessMessage }}
+        </v-alert>
+        <v-alert
+          v-if="apiErrorMessage"
+          type="error"
+          dismissible
+          @input="apiErrorMessage = ''"
+          class="mb-4"
+        >
+          {{ apiErrorMessage }}
+        </v-alert>
+      </v-col>
+    </v-row>
+
     <v-expansion-panels>
       <v-expansion-panel
         title="Playback Controls"
@@ -95,7 +120,7 @@
                 <v-col cols="3" class="text-right">
                   <label for="live">Live:</label>
                 </v-col>
-                <v-col cols="9" class="my-0">
+                <v-col cols="9" class="py-0">
                   <v-checkbox id="live" v-model="live" hide-details />
                 </v-col>
               </v-row>
@@ -116,6 +141,20 @@
                   />
                 </v-col>
               </v-row>
+
+              <!-- Request Video -->
+              <v-row class="justify-center">
+                <v-col cols="12" class="d-flex justify-center">
+                  <v-btn
+                    color="primary"
+                    @click="requestVideo"
+                    :disabled="!device || (!live && (!duration || duration <= 0))"
+                  >
+                    Request Video
+                  </v-btn>
+                </v-col>
+              </v-row>
+
             </v-card-text>
           </v-card>
         </v-expansion-panel-text>
@@ -128,7 +167,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import axios from 'axios';
 import { format, subHours, addDays } from 'date-fns';
 import { VTimePicker } from 'vuetify/lib/labs/components.mjs';
@@ -141,6 +180,8 @@ const live = ref(false);
 const dateTimeDialog = ref(false);
 const alertMessage = ref('');
 const currentTime = ref(Date.now());
+const apiErrorMessage = ref('');
+const apiSuccessMessage = ref('');
 
 const maxDate = format(addDays(new Date(), 0), 'yyyy-MM-dd');
 const minDate = format(subHours(new Date(), 48), 'yyyy-MM-dd');
@@ -202,6 +243,49 @@ const getDevices = async () => {
     console.error(error);
   }
 };
+
+const requestVideo = async () => {
+  try {
+    const response = await axios.post(
+      `http://${window.location.hostname}:${window.location.port}/api/recordings/`,
+      {
+        device: device.value.mac_address,
+        start_time: start_time.value,
+        duration: live ? 0 : duration.value,
+      }
+    );
+    // Set success message and clear error message
+    apiSuccessMessage.value = 'Video request was successful!';
+    apiErrorMessage.value = '';
+    console.log(response.data);
+  } catch (error) {
+    // Clear success message and set error message
+    apiSuccessMessage.value = '';
+    if (error.response && error.response.data && error.response.data.detail) {
+      apiErrorMessage.value = error.response.data.detail;
+    } else {
+      apiErrorMessage.value = 'An error occurred while requesting the video.';
+    }
+    console.error(error);
+  }
+};
+
+// Watchers to clear alerts after 5 seconds
+watch(apiSuccessMessage, (newValue) => {
+  if (newValue) {
+    setTimeout(() => {
+      apiSuccessMessage.value = '';
+    }, 5000);
+  }
+});
+
+watch(apiErrorMessage, (newValue) => {
+  if (newValue) {
+    setTimeout(() => {
+      apiErrorMessage.value = '';
+    }, 5000);
+  }
+});
 
 onMounted(() => {
   setInterval(() => {
