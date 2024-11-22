@@ -132,12 +132,13 @@
                 </v-col>
                 <v-col cols="9">
                   <v-text-field
-                  id="duration"
-                  v-model="duration"
-                  type="number"
-                  hide-details
-                  :disabled="live"
-                  append-icon="mdi-timer"
+                    id="duration"
+                    v-model="duration"
+                    type="number"
+                    :disabled="live"
+                    append-icon="mdi-timer"
+                    hint="Duration in minutes"
+                    persistent-hint
                   />
                 </v-col>
               </v-row>
