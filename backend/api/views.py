@@ -1,5 +1,6 @@
 # backend/api/views.py
 import requests
+import json
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -104,11 +105,9 @@ def update_device_status(request, mac_address):
 
 def send_request_to_device(ip_address, endpoint, payload):
     url = f"http://{ip_address}{endpoint}"
-    # Print out full url and payload for debugging
-    print(f"Sending request to {url} with payload: {payload}")
 
     try:
-        response = requests.post(url, data=payload, timeout=5)
+        response = requests.post(url, data=json.dumps(payload), timeout=5)
         response.raise_for_status()  # Raise an exception for HTTP errors
         return {"ip": ip_address, "success": True, "response": response.json()}
     except requests.RequestException as e:
@@ -124,8 +123,6 @@ def set_ota_server(request):
 
     results = []
     for device in devices:
-        print(device)
-        print(server)
         ip = device.get('ip_address')
         results.append(send_request_to_device(ip, "/otaserver", {"server": server}))
 
