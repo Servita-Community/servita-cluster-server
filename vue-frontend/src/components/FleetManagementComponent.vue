@@ -31,30 +31,114 @@
         </v-card>
       </v-col>
     </v-row>
+    <v-row>
+      <v-col>
+        <v-card class="mt-4">
+          <v-card-title>Device Actions</v-card-title>
+          <v-card-text>
+            <v-container>
+              <!-- OTA Server -->
+              <v-row class="align-center">
+                <v-col cols="8">
+                  <v-text-field
+                    v-model="otaServer"
+                    label="OTA Server"
+                    variant="outlined"
+                    clearable
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="4">
+                  <v-btn color="primary" block @click="applyOtaServer">
+                    Set OTA Server
+                  </v-btn>
+                </v-col>
+              </v-row>
+              <v-divider class="my-4"></v-divider>
+              <!-- LED Color Picker -->
+              <v-row class="align-center">
+                <v-col cols="8">
+                  <v-color-picker
+                    v-model="ledColor"
+                    mode="rgb"
+                    class="mb-4"
+                  ></v-color-picker>
+                </v-col>
+                <v-col cols="4">
+                  <v-btn color="primary" block @click="applyLedColor">
+                    Set LED Color
+                  </v-btn>
+                </v-col>
+              </v-row>
+              <v-divider class="my-4"></v-divider>
+              <!-- Network Settings -->
+              <v-row class="align-center">
+                <v-col cols="4">
+                  <v-text-field
+                    v-model="ssid"
+                    label="SSID"
+                    variant="outlined"
+                    clearable
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="4">
+                  <v-text-field
+                    v-model="password"
+                    label="Password"
+                    variant="outlined"
+                    clearable
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="4">
+                  <v-btn color="primary" block @click="applyNetworkSettings">
+                    Connect to Network
+                  </v-btn>
+                </v-col>
+              </v-row>
+              <v-divider class="my-4"></v-divider>
+              <!-- Deep Sleep -->
+              <v-row class="align-center">
+                <v-col>
+                  <v-btn
+                    color="red darken-3"
+                    class="white--text"
+                    block
+                    @click="applyDeepSleep"
+                  >
+                    Enter Deep Sleep
+                  </v-btn>
+                </v-col>
+              </v-row>
+            </v-container>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
   </v-container>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import axios from "axios";
 
-// Raw devices data
+// Device Management State
 const devices = ref([]);
+const otaServer = ref("");
+const ledColor = ref({ r: 255, g: 255, b: 255 });
+const ssid = ref("");
+const password = ref("");
 
-// Fetch device statuses from API
 const baseUrl = `${window.location.origin}/api/devices/statuses/`;
 
 async function fetchDeviceStatuses() {
   try {
     const response = await axios.get(baseUrl);
     devices.value = response.data.map((device) => ({
-      select: device.mac_address, // Unique identifier for checkbox selection
-      ipAddress: device.ip_address,
+      select: device.mac_address,
       macAddress: device.mac_address,
+      ipAddress: device.ip_address,
       location: device.location || "Unknown",
-      uptime: calculateUptime(device.initial_uptime),
-      downtime: calculateDowntime(device.last_seen),
       version: device.version,
+      uptime: calculateUptime(device.initial_uptime),
       isUp: device.is_up,
     }));
   } catch (error) {
@@ -62,15 +146,9 @@ async function fetchDeviceStatuses() {
   }
 }
 
-// Helper functions
 function calculateUptime(initialUptime) {
   const uptimeDuration = Math.floor((new Date() - new Date(initialUptime)) / 1000);
   return formatDuration(uptimeDuration);
-}
-
-function calculateDowntime(lastSeen) {
-  const downtimeDuration = Math.floor((new Date() - new Date(lastSeen)) / 1000);
-  return formatDuration(downtimeDuration);
 }
 
 function formatDuration(seconds) {
@@ -80,24 +158,21 @@ function formatDuration(seconds) {
   return `${hours}h ${minutes}m ${secs}s`;
 }
 
-// Filter active devices and format them for the table
+// Formatted Active Devices
 const activeDevicesFormatted = computed(() =>
-  devices.value
-    .filter((device) => device.isUp) // Only include active devices
-    .map((device) => ({
-      Select: device.macAddress, // Unique identifier for selection
-      "MAC Address": device.macAddress,
-      "IP Address": device.ipAddress,
-      Firmware: device.version,
-      Location: device.location,
-      Uptime: device.uptime,
-    }))
+  devices.value.filter((device) => device.isUp).map((device) => ({
+    Select: device.macAddress,
+    "MAC Address": device.macAddress,
+    "IP Address": device.ipAddress,
+    Firmware: device.version,
+    Location: device.location,
+    Uptime: device.uptime,
+  }))
 );
 
-// Selected devices map
 const selectedDevicesMap = ref({});
 
-// Update selection map whenever devices change
+// Watch Selected Devices
 watch(
   activeDevicesFormatted,
   (newDevices) => {
@@ -110,18 +185,15 @@ watch(
   { immediate: true, deep: true }
 );
 
-// Computed property for selected devices
 const selectedDevices = computed(() =>
   activeDevicesFormatted.value.filter((device) => selectedDevicesMap.value[device["MAC Address"]])
 );
 
-// Check if all devices are selected
-const isAllSelected = computed(() => 
+const isAllSelected = computed(() =>
   activeDevicesFormatted.value.length > 0 &&
   activeDevicesFormatted.value.every((device) => selectedDevicesMap.value[device["MAC Address"]])
 );
 
-// Toggle all devices' selection state
 function toggleSelectAll() {
   const selectAll = !isAllSelected.value;
   activeDevicesFormatted.value.forEach((device) => {
@@ -129,19 +201,51 @@ function toggleSelectAll() {
   });
 }
 
-// Handle checkbox change
-function onCheckboxChange() {
-  console.log("Selected devices:", selectedDevices.value);
+async function applyOtaServer() {
+  const payload = {
+    devices: selectedDevices.value.map(device => ({ ip_address: device["IP Address"] })),
+    server: otaServer.value,
+  };
+  await applyToBackend("/api/devices/actions/ota/", payload);
 }
 
-// Periodic refresh
-let intervalId;
+async function applyLedColor() {
+  const payload = {
+    devices: selectedDevices.value.map(device => ({ ip_address: device["IP Address"] })),
+    red: ledColor.value.r,
+    green: ledColor.value.g,
+    blue: ledColor.value.b,
+  };
+  await applyToBackend("/api/devices/actions/led/", payload);
+}
+
+async function applyNetworkSettings() {
+  const payload = {
+    devices: selectedDevices.value.map(device => ({ ip_address: device["IP Address"] })),
+    ssid: ssid.value,
+    password: password.value,
+  };
+  await applyToBackend("/api/devices/actions/network/", payload);
+}
+
+async function applyDeepSleep() {
+  const payload = {
+    devices: selectedDevices.value.map(device => ({ ip_address: device["IP Address"] })),
+  };
+  await applyToBackend("/api/devices/actions/sleep/", payload);
+}
+
+async function applyToBackend(url, payload) {
+  try {
+    const response = await axios.post(url, payload);
+    console.log("Action applied successfully:", response.data);
+  } catch (error) {
+    console.error("Failed to apply action:", error);
+  }
+}
+
 onMounted(() => {
   fetchDeviceStatuses();
-  intervalId = setInterval(fetchDeviceStatuses, 10000);
-});
-
-onUnmounted(() => {
-  clearInterval(intervalId);
+  setInterval(fetchDeviceStatuses, 10000);
 });
 </script>
