@@ -161,6 +161,8 @@
       </v-expansion-panel>
     </v-expansion-panels>
 
+    <v-divider class="my-4" />
+
     <!-- TODO: Video Player -->
 
   </v-container>
