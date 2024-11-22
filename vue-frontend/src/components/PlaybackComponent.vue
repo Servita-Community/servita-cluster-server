@@ -12,13 +12,14 @@
             <v-card-text>
               <!-- Device Selection -->
               <v-row class="align-center">
-                <v-col cols="2" class="text-right">
+                <v-col cols="3" class="text-right">
                   <label for="device">Device:</label>
                 </v-col>
-                <v-col cols="8">
+                <v-col cols="9">
                   <v-select
                     id="device"
                     v-model="device"
+                    append-icon="mdi-camera"
                     :items="deviceList"
                     item-title="location"
                     hide-details
@@ -27,71 +28,92 @@
               </v-row>
               <!-- Start Time Picker -->
               <v-row class="align-center">
-                <v-col cols="2" class="text-right">
+                <v-col cols="3" class="text-right">
                   <label for="start_time">Start Time:</label>
                 </v-col>
-                <v-col cols="8">
-                  <v-dialog v-model="dateTimeDialog" max-width="500">
+                <v-col cols="9">
+                  <v-dialog
+                    v-model="dateTimeDialog"
+                    max-width="800px"
+                    class="justify-center"
+                  >
                     <template v-slot:activator="{ props: activatorProps }">
                       <v-text-field
                         v-model="formattedDateTime"
                         label="Select Date and Time"
-                        prepend-icon="mdi-calendar-clock"
+                        append-icon="mdi-calendar-clock"
                         readonly
                         v-bind="activatorProps"
                         hide-details
                       ></v-text-field>
                     </template>
-                    <template v-slot:default="{ getting_time }">
-                      <v-card justify="center">
-                        <v-row class="justify-center">
-                          <v-col>
-                            <v-date-picker
-                              v-model="date"
-                              :max="new Date(maxDate)"
-                              :min="new Date(minDate)"
-                              no-title
-                              scrollable
-                            ></v-date-picker>
-                          </v-col>
-                          <v-col>
-                            <v-time-picker
-                              v-model="time"
-                              full-width
-                              format="24hr"
-                            ></v-time-picker>
-                            <v-btn
-                              color="primary"
-                              @click="saveDateTime; getting_time = false"
-                            >Save</v-btn>
-                          </v-col>
-                        </v-row>
-                      </v-card>
-                    </template>
+                    <v-card class="justify-center">
+                      <v-alert
+                        v-if="alertMessage"
+                        type="error"
+                        dismissible
+                        @input="alertMessage = ''"
+                      >
+                        {{ alertMessage }}
+                      </v-alert>
+                      <v-row>
+                        <v-col class="justify-center">
+                          <v-date-picker
+                            v-model="date"
+                            :max="maxDate"
+                            :min="minDate"
+                            no-title
+                            scrollable
+                          ></v-date-picker>
+                        </v-col>
+                        <v-col class="justify-center">
+                          <v-time-picker
+                            v-model="time"
+                            full-width
+                            format="24hr"
+                          ></v-time-picker>
+                        </v-col>
+                      </v-row>
+                      <v-row class="justify-center">
+                        <v-col class="d-flex justify-center">
+                          <v-btn
+                            class="mb-4"
+                            color="primary"
+                            @click="saveDateTime"
+                          >
+                            Save
+                          </v-btn>
+                        </v-col>
+                      </v-row>
+                    </v-card>
                   </v-dialog>
                 </v-col>
               </v-row>
-              <!-- Duration -->
-              <v-row class="align-center">
-                <v-col cols="2" class="text-right">
-                  <label for="duration">Duration:</label>
-                </v-col>
-                <v-col cols="8">
-                  <v-text-field
-                    id="duration"
-                    v-model="duration"
-                    type="number"
-                    hide-details
-                  />
-                </v-col>
-              </v-row>
+
               <!-- Live Checkbox -->
               <v-row class="align-center">
-                <v-col cols="2" class="text-right">
+                <v-col cols="3" class="text-right">
                   <label for="live">Live:</label>
                 </v-col>
-                <v-col cols="8">
+                <v-col cols="9" class="my-0">
                   <v-checkbox id="live" v-model="live" hide-details />
+                </v-col>
+              </v-row>
+
+              <!-- Duration -->
+              <v-row class="align-center">
+                <v-col cols="3" class="text-right">
+                  <label for="duration" :style="{ color: live ? 'grey' : 'inherit' }">Duration:</label>
+                </v-col>
+                <v-col cols="9">
+                  <v-text-field
+                  id="duration"
+                  v-model="duration"
+                  type="number"
+                  hide-details
+                  :disabled="live"
+                  append-icon="mdi-timer"
+                  />
                 </v-col>
               </v-row>
             </v-card-text>
@@ -99,14 +121,17 @@
         </v-expansion-panel-text>
       </v-expansion-panel>
     </v-expansion-panels>
+
+    <!-- TODO: Video Player -->
+
   </v-container>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import axios from 'axios';
-import { format, subHours } from 'date-fns';
-import { VTimePicker } from 'vuetify/labs/VTimePicker'
+import { format, subHours, addDays } from 'date-fns';
+import { VTimePicker } from 'vuetify/lib/labs/components.mjs';
 
 const deviceList = ref([]);
 const device = ref('');
@@ -114,9 +139,10 @@ const start_time = ref(new Date());
 const duration = ref(0);
 const live = ref(false);
 const dateTimeDialog = ref(false);
+const alertMessage = ref('');
 const currentTime = ref(Date.now());
 
-const maxDate = format(new Date(), 'yyyy-MM-dd');
+const maxDate = format(addDays(new Date(), 0), 'yyyy-MM-dd');
 const minDate = format(subHours(new Date(), 48), 'yyyy-MM-dd');
 
 // Separate refs for date and time pickers
@@ -130,15 +156,25 @@ const formattedDateTime = computed(() =>
 
 // Method to handle date and time selection
 const saveDateTime = () => {
-  // Combine date and time into a single Date object
   const [hours, minutes] = time.value.split(':').map(Number);
   const selectedDate = new Date(date.value);
   selectedDate.setHours(hours);
   selectedDate.setMinutes(minutes);
   selectedDate.setSeconds(0);
   selectedDate.setMilliseconds(0);
-  start_time.value = selectedDate;
-  dateTimeDialog.value = false; // Close the dialog
+
+  const now = new Date();
+  const time48HoursAgo = subHours(now, 48);
+
+  if (selectedDate > now) {
+    alertMessage.value = 'Selected time cannot be in the future.';
+  } else if (selectedDate < time48HoursAgo) {
+    alertMessage.value = 'Selected time cannot be more than 48 hours ago.';
+  } else {
+    start_time.value = selectedDate;
+    dateTimeDialog.value = false; // Close the dialog
+    alertMessage.value = ''; // Clear any previous alert
+  }
 };
 
 // Fetch devices from the API
