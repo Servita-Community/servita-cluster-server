@@ -192,10 +192,12 @@ const fetchStreamIds = () => {
             // Parse location from description
             // Assuming description is "Location: Some Location, port: 5000"
             const description = stream.description || '';
-            const locationMatch = description.match(/Location:\s*([^,]+),\s*port:/);
+            const locationMatch = description.match(/Location:\s*([^,]+)/);
             if (locationMatch) {
-              const location = locationMatch[1];
-              streamMap[location] = stream.id;
+              const streamLocation = locationMatch[1];
+              streamMap[streamLocation] = stream.id;
+              console.log('Janus stream location:', streamLocation);
+              console.log('StreamMap:', streamMap);
             }
           });
 
@@ -221,24 +223,24 @@ const fetchStreamIds = () => {
 
 // Attach plugins for each selected stream
 const attachPlugins = () => {
-  pluginHandles.value = []; // Reset plugin handles
-  selectedStreams.value.forEach((macAddress, index) => {
+  pluginHandles.value = {}; // Use an object for plugin handles
+  selectedStreams.value.forEach((macAddress) => {
     const stream = streams.value.find(s => s.mac_address === macAddress);
     if (!stream) {
       console.error(`No stream found for MAC address ${macAddress}`);
       return;
     }
-    const location = stream.location;
-    const streamId = janusStreamMap.value[location];
+    const deviceLocation = stream.location;
+    const streamId = janusStreamMap.value[deviceLocation];
     if (!streamId) {
-      console.error(`No stream ID found for location ${location}`);
+      console.error(`No stream ID found for location ${deviceLocation}`);
       return;
     }
 
     janus.value.attach({
       plugin: 'janus.plugin.streaming',
       success: (handle) => {
-        pluginHandles.value[index] = handle;
+        pluginHandles.value[macAddress] = handle;
         console.log('Plugin attached:', handle);
         handle.send({ message: { request: 'watch', id: streamId } });
       },
@@ -247,11 +249,17 @@ const attachPlugins = () => {
       },
       onmessage: (_msg, jsep) => {
         if (jsep) {
-          pluginHandles.value[index].createAnswer({
+          const pluginHandle = pluginHandles.value[macAddress];
+          pluginHandle.createAnswer({
             jsep: jsep,
-            media: { audioSend: false, videoSend: false },
+            media: {
+              audioRecv: false,
+              videoRecv: true,
+              audioSend: false,
+              videoSend: false,
+            },
             success: (ourJsep) => {
-              pluginHandles.value[index].send({ message: { request: 'start' }, jsep: ourJsep });
+              pluginHandle.send({ message: { request: 'start' }, jsep: ourJsep });
             },
             error: (error) => {
               console.error('WebRTC error:', error);
@@ -261,13 +269,13 @@ const attachPlugins = () => {
       },
       onremotetrack: (track, _mid, added) => {
         if (track.kind === 'video' && added) {
-          const videoElement = document.getElementById(`video-${stream.mac_address}`);
+          const videoElement = document.getElementById(`video-${macAddress}`);
           if (videoElement) {
             const mediaStream = new MediaStream();
             mediaStream.addTrack(track.clone());
             videoElement.srcObject = mediaStream;
           } else {
-            console.error(`Video element with id video-${stream.mac_address} not found`);
+            console.error(`Video element with id video-${macAddress} not found`);
           }
         }
       },
@@ -280,6 +288,7 @@ const attachPlugins = () => {
     });
   });
 };
+
 
 // Start or stop streaming for all selected streams
 const toggleStream = async () => {

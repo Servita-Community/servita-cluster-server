@@ -4,33 +4,21 @@
       <v-card-title class="text-center text-h6">
         Settings Page
       </v-card-title>
+      <v-divider />
       <v-card-text class="text-center">
-        <v-icon :color="isLedOn ? 'green' : 'red'">
-          {{ isLedOn ? 'mdi-led-on' : 'mdi-led-off' }}
-        </v-icon>
+        <v-text-field v-model="baseport.front" type="number" />
       </v-card-text>
     </v-card>
   </v-container>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
+const baseport = ref({"front": 5000, "backend": 5000});
 
-const isLedOn = ref(false)
+// TODO: UDP/TCP slider
 
-const toggleLed = () => {
-  isLedOn.value = !isLedOn.value
-}
-
-let intervalId
-
-onMounted(() => {
-  intervalId = setInterval(toggleLed, 1000)
-})
-
-onUnmounted(() => {
-  clearInterval(intervalId)
-})
+// TODO: 
 </script>
 
 <style scoped>

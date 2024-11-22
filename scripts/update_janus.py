@@ -152,7 +152,6 @@ def update_janus_server(on_devices, janus_url):
             "audio": False,
             "video": True,
             "url": f"rtsp://{device['ip_address']}:554/",
-            "videocodec": "h264",
             "secret": "adminpwd",
             "rtsp_reconnect_delay": 5,
             "rtsp_session_timeout": 0,

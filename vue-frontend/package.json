@@ -12,6 +12,7 @@
     "@mdi/font": "5.9.55",
     "axios": "^1.7.7",
     "core-js": "^3.8.3",
+    "date-fns": "^4.1.0",
     "exports-loader": "^5.0.0",
     "janus-gateway": "^1.2.4",
     "roboto-fontface": "*",
