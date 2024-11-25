@@ -171,3 +171,35 @@ def trigger_deep_sleep(request):
         results.append(send_request_to_device(ip, "/deepsleep", {}))
 
     return Response({"results": results}, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+def set_stream_settings(request):
+    """Set stream settings on selected devices."""
+    devices = request.data.get('devices', [])
+    fps = request.data.get('fps', None)
+    resolution = request.data.get('resolution', None)
+    bitrate = request.data.get('bitrate', None)
+    exposureMode = request.data.get('exposureMode', None)
+    exposure = request.data.get('exposure', None)
+    gain = request.data.get('gain', None)
+
+    results = []
+    for device in devices:
+        ip = device.get('ip_address')
+        payload = {}
+        if fps is not None:
+            payload['fps'] = fps
+        if resolution is not None:
+            payload['resolution'] = resolution
+        if bitrate is not None:
+            payload['bitrate'] = bitrate
+        if exposureMode is not None:
+            payload['exposureMode'] = exposureMode
+        if exposure is not None:
+            payload['exposure'] = exposure
+        if gain is not None:
+            payload['gain'] = gain
+
+        results.append(send_request_to_device(ip, "/setstream", payload))
+
+    return Response({"results": results}, status=status.HTTP_200_OK)
