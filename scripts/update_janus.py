@@ -3,6 +3,9 @@ import json
 import time
 import argparse
 import logging
+import subprocess
+import signal
+import sys
 
 logging.basicConfig(level=logging.INFO)
 
@@ -129,7 +132,9 @@ def remove_stream(janus_url, session_id, handle_id, stream_id):
         logging.error(f"Error removing stream {stream_id}: {response}")
 
 
-def update_janus_server(on_devices, janus_url):
+def update_janus_server(
+    on_devices_sorted, janus_url, ffmpeg_processes, first_run=False
+):
     logging.info("Updating Janus server...")
 
     session_id = create_janus_session(janus_url)
@@ -142,21 +147,26 @@ def update_janus_server(on_devices, janus_url):
 
     existing_stream_ids = list_streams(janus_url, session_id, handle_id)
 
+    if first_run:
+        # Remove all existing streams
+        for stream_id in existing_stream_ids:
+            remove_stream(janus_url, session_id, handle_id, stream_id)
+        existing_stream_ids = []
+
     desired_streams = {}
-    for idx, device in enumerate(on_devices):
-        stream_id = 5000 + idx
+    for idx, device in enumerate(on_devices_sorted):
+        port = 5000 + idx
+        stream_id = port
         desired_streams[stream_id] = {
-            "type": "rtsp",
+            "type": "rtp",
             "id": stream_id,
-            "description": f"Location: {device['location']}",
+            "description": f"Location: {device['location']}, port: {port}",
             "audio": False,
             "video": True,
-            "url": f"rtsp://{device['ip_address']}:554/",
+            "videoport": port,
+            "videopt": 96,
+            "videocodec": "H264",
             "secret": "adminpwd",
-            "rtsp_reconnect_delay": 5,
-            "rtsp_session_timeout": 0,
-            "rtsp_timeout": 10,
-            "rtsp_conn_timeout": 5,
         }
 
     # Streams to add and remove
@@ -167,14 +177,70 @@ def update_janus_server(on_devices, janus_url):
     for stream_id in streams_to_add:
         stream_config = desired_streams[stream_id]
         add_stream(janus_url, session_id, handle_id, stream_config)
+        # Start ffmpeg process
+        device = next(
+            (
+                d
+                for d in on_devices_sorted
+                if 5000 + on_devices_sorted.index(d) == stream_id
+            ),
+            None,
+        )
+        if device:
+            ffmpeg_process = start_ffmpeg_process(device["ip_address"], stream_id)
+            ffmpeg_processes[stream_id] = ffmpeg_process
 
     # Remove old streams
     for stream_id in streams_to_remove:
         remove_stream(janus_url, session_id, handle_id, stream_id)
+        # Stop ffmpeg process
+        stop_ffmpeg_process(ffmpeg_processes, stream_id)
 
     # Clean up: detach and destroy session
     detach_from_plugin(janus_url, session_id, handle_id)
     destroy_janus_session(janus_url, session_id)
+
+
+def start_ffmpeg_process(device_ip, stream_port):
+    ffmpeg_command = [
+        "ffmpeg",
+        "-re",
+        "-rtsp_transport",
+        "tcp",
+        "-i",
+        f"rtsp://{device_ip}:554/",
+        "-vcodec",
+        "copy",
+        "-f",
+        "rtp",
+        f"rtp://127.0.0.1:{stream_port}",
+    ]
+    logging.info(
+        f"Starting ffmpeg process for device {device_ip} on port {stream_port}"
+    )
+    try:
+        process = subprocess.Popen(
+            ffmpeg_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+        return process
+    except Exception as e:
+        logging.error(f"Failed to start ffmpeg process: {e}")
+        return None
+
+
+def stop_ffmpeg_process(ffmpeg_processes, stream_id):
+    process = ffmpeg_processes.get(stream_id)
+    if process:
+        logging.info(f"Stopping ffmpeg process for stream {stream_id}")
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            logging.warning(f"ffmpeg process {stream_id} did not terminate, killing it")
+            process.kill()
+        del ffmpeg_processes[stream_id]
+    else:
+        logging.warning(f"No ffmpeg process found for stream {stream_id}")
 
 
 def detach_from_plugin(janus_url, session_id, handle_id):
@@ -203,6 +269,14 @@ def destroy_janus_session(janus_url, session_id):
         logging.error("Failed to destroy Janus session")
 
 
+def signal_handler(sig, frame):
+    logging.info("Interrupt received, shutting down...")
+    global ffmpeg_processes
+    for stream_id in list(ffmpeg_processes.keys()):
+        stop_ffmpeg_process(ffmpeg_processes, stream_id)
+    sys.exit(0)
+
+
 def main():
     args = parse_arguments()
     logging.info(
@@ -212,7 +286,15 @@ def main():
         f"Scan Interval: {args.scan_interval} seconds\n"
     )
 
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
     previous_device_ids = set()
+    global ffmpeg_processes
+    ffmpeg_processes = {}  # stream_id: ffmpeg_process
+
+    first_run = True
+
     while True:
         logging.info("Starting network scan...")
         devices = get_devices(args.api_endpoint)
@@ -223,13 +305,16 @@ def main():
         logging.info(f"Found {len(devices)} devices.")
         on_devices = [device for device in devices if device["is_up"]]
 
-        # Extract device IDs (e.g., MAC addresses)
-        current_device_ids = set(device["mac_address"] for device in on_devices)
+        on_devices_sorted = sorted(on_devices, key=lambda d: d["mac_address"])
+        current_device_ids = set(device["mac_address"] for device in on_devices_sorted)
 
-        if current_device_ids != previous_device_ids:
+        if current_device_ids != previous_device_ids or first_run:
             logging.info("Device list has changed. Updating Janus server.")
-            update_janus_server(on_devices, args.janus_url)
+            update_janus_server(
+                on_devices_sorted, args.janus_url, ffmpeg_processes, first_run
+            )
             previous_device_ids = current_device_ids
+            first_run = False  # Set to False after first run
         else:
             logging.info("No change in device list.")
 
