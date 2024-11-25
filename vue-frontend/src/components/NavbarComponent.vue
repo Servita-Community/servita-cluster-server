@@ -37,7 +37,7 @@
     <v-navigation-drawer app v-model="rightDrawer" temporary location="right">
       <v-list>
         <v-list-item
-          v-for="(device, index) in devices"
+          v-for="(device, index) in sortedDevices"
           :key="device.mac_address + '-' + index"
           :href="'http://' + device.ip_address"
           target="_blank"
