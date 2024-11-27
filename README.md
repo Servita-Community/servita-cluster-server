@@ -24,6 +24,17 @@ Cluster server Vue/Vuetify frontend and Django REST Python backend code.
     ```
     The backend server should now be running on `http://0.0.0.0:8000`. You can now proceed to setting up the frontend.
 
+6. The `network_scanner` service needs to be setup to scan for cameras on the network and add them to the database.
+   1. Navigate to the project root directory if not there already `cd ubivision-cluster-server`
+   2. Look at the arguments that can be passed to the `setup_network_scanner.sh` script by running
+        ```bash
+        ./setup/setup_network_scanner.sh --help
+        ```
+        1. You will see the parameters that you can pass to the script. To setup with default parameters (assuming you used the same `localhost:8000` setup above), run
+            ```bash
+            ./setup/setup_network_scanner.sh
+            ```
+
 ## Setting up the frontend
 1. Install Node.js and npm
 
