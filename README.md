@@ -28,18 +28,34 @@ Cluster server Vue/Vuetify frontend and Django REST Python backend code.
     ```bash
     poetry run backend/manage.py runserver 0.0.0.0:8000
     ```
-    The backend server should now be running on [http://0.0.0.0:8000](http://_vscodecontentref_/0). You can now proceed to setting up the frontend.
+    The backend server should now be running on [http://localhost:8000](http://localhost:8000). You can now proceed to setting up the frontend.
 
-6. The `network_scanner` service needs to be set up to scan for cameras on the network and add them to the database.
-   1. Navigate to the project root directory if not there already `cd ubivision-cluster-server`
-   2. Look at the arguments that can be passed to the `setup_network_scanner.sh` script by running
+6. The `scripts/network_scanner.py` file can be used to test if the backend is properly setup. 
+   1. Open a new terminal window and type the following command to run the network scanner script
         ```bash
-        ./setup/setup_network_scanner.sh --help
+        poetry run network_scanner.py -h
+        ```
+    2. If devices on your network show up as `192.168.1.X` and you setup the backend on `localhost:8000`, you can run the following command to add the devices to the database
+        ```bash
+        poetry run network_scanner.py
+        ```
+    3. Otherwise, you can change the network CIDR using:
+        ```bash
+        poetry run network_scanner.py --network_cidr X.X.X.X/X
+        ```
+        1. e.g., `poetry run network_scanner.py --network_cidr 192.168.30.0/24`
+
+7. The `network_scanner` service can be set up to scan for cameras on the network and add them to the database in the background. Use the following scripts if you want to not have to run the `network_scanner.py` script manually.
+   1. Navigate to the project root directory if not there already `cd ubivision-cluster-server`
+   2. Look at the arguments that can be passed to the `setup_network_scan_service.sh` script by running
+        ```bash
+        ./setup/setup_network_scan_service.sh --help
         ```
    3. To set up with default parameters (assuming you used the same `localhost:8000` setup above), run
         ```bash
-        ./setup/setup_network_scanner.sh
+        sudo ./setup/setup_network_scan_service.sh
         ```
+    4. The script needs to be run with `sudo` to allow the script to properly setup poetry.
 
 ## Setting up the frontend
 1. Install Node.js and npm
