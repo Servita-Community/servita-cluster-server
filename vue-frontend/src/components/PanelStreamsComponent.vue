@@ -80,66 +80,73 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import axios from 'axios'
-import { Janus } from 'janus-gateway'
+import { ref, onMounted } from 'vue';
+import axios from 'axios';
+import { Janus } from 'janus-gateway';
 
-const isLedOn = ref(false)
-const isStreaming = ref(false)
-const isLoading = ref(false)
-const selectedStreams = ref([]) // Array to hold selected streams
-const streamSize = ref(3) // Number of streams to display
-const streams = ref([]) // Array of devices fetched from the backend
-const janus = ref(null)
-const pluginHandles = ref([]) // Store plugin handles for each Janus stream
-const janusRunning = ref(false)
-const enlargedStreamIndex = ref(null) // Index of the stream to enlarge
+const isLedOn = ref(false);
+const isStreaming = ref(false);
+const isLoading = ref(false);
+const selectedStreams = ref([]); // Array of selected stream MAC addresses
+const streamSize = ref(3); // Number of streams to display
+const streams = ref([]); // Array of devices fetched from the backend
+const janus = ref(null);
+const pluginHandles = ref([]); // Store plugin handles for each Janus stream
+const janusStreamMap = ref({}); // Map from location to stream ID
+const enlargedStreamIndex = ref(null); // Index of the stream to enlarge
 
 // Update aspect ratio when a stream is clicked
 const toggleEnlargeStream = (index) => {
-  enlargedStreamIndex.value = enlargedStreamIndex.value === index ? null : index
-}
+  enlargedStreamIndex.value = enlargedStreamIndex.value === index ? null : index;
+};
 
 // Toggle selection for a stream
 const toggleSelectedStream = (macAddress) => {
-  const index = selectedStreams.value.indexOf(macAddress)
+  const index = selectedStreams.value.indexOf(macAddress);
   if (index === -1) {
-    selectedStreams.value.push(macAddress)
+    selectedStreams.value.push(macAddress);
     if (isStreaming.value) {
-      stopJanus()
-      startJanus()
+      // Restart Janus to include new stream
+      stopJanus();
+      startJanus();
     }
   } else {
-    selectedStreams.value.splice(index, 1)
+    selectedStreams.value.splice(index, 1);
+    if (isStreaming.value) {
+      // Restart Janus without the removed stream
+      stopJanus();
+      startJanus();
+    }
   }
-}
+};
 
 // Fetch streams from API
 const fetchStreams = async () => {
   try {
-    const response = await axios.get(`http://${window.location.hostname}:${window.location.port}/api/devices/statuses/`)
+    const response = await axios.get(`http://${window.location.hostname}:${window.location.port}/api/devices/statuses/`);
     streams.value = response.data.filter(device => device.is_up && device.ip_address).map(device => ({
       mac_address: device.mac_address,
       ip_address: device.ip_address,
       location: device.location,
       last_seen: device.last_seen,
-    }))
+    }));
   } catch (error) {
-    console.error('Failed to fetch device statuses:', error)
+    console.error('Failed to fetch device statuses:', error);
   }
-}
+};
 
+// Initialize Janus
 const startJanus = () => {
   if (!Janus.isWebrtcSupported()) {
     console.error('No WebRTC support... ');
     return;
+  } else {
+    Janus.init({
+      debug: 'all',
+      dependencies: Janus.useDefaultDependencies(),
+      callback: createSession,
+    })
   }
-  Janus.init({
-    debug: 'all',
-    dependencies: Janus.useDefaultDependencies(),
-    callback: createSession,
-  }); 
-  createSession();
 };
 
 const createSession = () => {
@@ -179,9 +186,25 @@ const fetchStreamIds = () => {
           const streamsData = response.list || [];
           console.log('Available Streams:', response);
 
-          // Map stream IDs for user selection
-          const streamIds = streamsData.map((stream) => stream.id);
-          attachPlugins(streamIds); // Pass the stream IDs to attachPlugins
+          // Build a mapping from location to stream ID
+          const streamMap = {};
+          streamsData.forEach((stream) => {
+            // Parse location from description
+            // Assuming description is "Location: Some Location, port: 5000"
+            const description = stream.description || '';
+            const locationMatch = description.match(/Location:\s*([^,]+)/);
+            if (locationMatch) {
+              const streamLocation = locationMatch[1];
+              streamMap[streamLocation] = stream.id;
+              console.log('Janus stream location:', streamLocation);
+              console.log('StreamMap:', streamMap);
+            }
+          });
+
+          janusStreamMap.value = streamMap;
+
+          // Proceed to attach plugins
+          attachPlugins();
         },
         error: (error) => {
           console.error('Error fetching streams:', error);
@@ -199,46 +222,60 @@ const fetchStreamIds = () => {
 };
 
 // Attach plugins for each selected stream
-const attachPlugins = (streamIds) => {
-  pluginHandles.value = []; // Reset plugin handles
-  selectedStreams.value.forEach((_, index) => {
-    const streamId = streamIds[index % streamIds.length]; // Adjust stream IDs as necessary
+const attachPlugins = () => {
+  pluginHandles.value = {}; // Use an object for plugin handles
+  selectedStreams.value.forEach((macAddress) => {
+    const stream = streams.value.find(s => s.mac_address === macAddress);
+    if (!stream) {
+      console.error(`No stream found for MAC address ${macAddress}`);
+      return;
+    }
+    const deviceLocation = stream.location;
+    const streamId = janusStreamMap.value[deviceLocation];
+    if (!streamId) {
+      console.error(`No stream ID found for location ${deviceLocation}`);
+      return;
+    }
 
     janus.value.attach({
       plugin: 'janus.plugin.streaming',
       success: (handle) => {
-        pluginHandles.value[index] = handle;
+        pluginHandles.value[macAddress] = handle;
         console.log('Plugin attached:', handle);
         handle.send({ message: { request: 'watch', id: streamId } });
       },
       error: (error) => {
         console.error('Error attaching plugin:', error);
-        // Handle plugin error, perhaps try to reattach after a delay
       },
       onmessage: (_msg, jsep) => {
         if (jsep) {
-          pluginHandles.value[index].createAnswer({
+          const pluginHandle = pluginHandles.value[macAddress];
+          pluginHandle.createAnswer({
             jsep: jsep,
-            media: { audioSend: false, videoSend: false },
+            media: {
+              audioRecv: false,
+              videoRecv: true,
+              audioSend: false,
+              videoSend: false,
+            },
             success: (ourJsep) => {
-              pluginHandles.value[index].send({ message: { request: 'start' }, jsep: ourJsep });
+              pluginHandle.send({ message: { request: 'start' }, jsep: ourJsep });
             },
             error: (error) => {
               console.error('WebRTC error:', error);
-              // Handle WebRTC error, possibly attempt to reattach
             },
           });
         }
       },
       onremotetrack: (track, _mid, added) => {
         if (track.kind === 'video' && added) {
-          const videoElement = document.getElementById(`video-${selectedStreams.value[index]}`);
+          const videoElement = document.getElementById(`video-${macAddress}`);
           if (videoElement) {
-            const stream = new MediaStream();
-            stream.addTrack(track.clone());
-            videoElement.srcObject = stream;
+            const mediaStream = new MediaStream();
+            mediaStream.addTrack(track.clone());
+            videoElement.srcObject = mediaStream;
           } else {
-            console.error(`Video element with id video-${selectedStreams.value[index]} not found`);
+            console.error(`Video element with id video-${macAddress} not found`);
           }
         }
       },
@@ -247,57 +284,55 @@ const attachPlugins = (streamIds) => {
       },
       ondetached: () => {
         console.log('Plugin detached');
-        // Handle plugin detachment, possibly reattach
       },
     });
   });
 };
 
+
 // Start or stop streaming for all selected streams
 const toggleStream = async () => {
   if (isStreaming.value) {
-    stopJanus()
-    isStreaming.value = false
-    isLedOn.value = false
+    stopJanus();
+    isStreaming.value = false;
+    isLedOn.value = false;
   } else {
-    isLoading.value = true
+    isLoading.value = true;
     try {
-      await new Promise(resolve => setTimeout(resolve, 2000)) // Simulate delay
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate delay
       if (selectedStreams.value.length > 0) {
-        startJanus()
-        isStreaming.value = true
-        isLedOn.value = true
+        startJanus();
+        isStreaming.value = true;
+        isLedOn.value = true;
       } else {
-        console.error('No streams selected')
+        console.error('No streams selected');
       }
     } catch (error) {
-      console.error('Failed to start the streams:', error)
+      console.error('Failed to start the streams:', error);
     } finally {
-      isLoading.value = false
+      isLoading.value = false;
     }
   }
-}
+};
 
 // Stop Janus and detach plugins
 const stopJanus = () => {
-  pluginHandles.value.forEach(handle => {
+  Object.values(pluginHandles.value).forEach(handle => {
     if (handle) {
-      handle.hangup()
-      handle.detach()
+      handle.hangup();
+      handle.detach();
     }
-  })
-  pluginHandles.value = []
+  });
+  pluginHandles.value = [];
 
   if (janus.value) {
-    janus.value.destroy()
-    janus.value = null
+    janus.value.destroy();
+    janus.value = null;
   }
+};
 
-  janusRunning.value = false
-}
-
-onMounted(fetchStreams)
-setInterval(fetchStreams, 10000)
+onMounted(fetchStreams);
+setInterval(fetchStreams, 10000);
 </script>
 
 <style scoped>

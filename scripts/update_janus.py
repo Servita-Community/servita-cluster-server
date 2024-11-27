@@ -160,7 +160,7 @@ def update_janus_server(
         desired_streams[stream_id] = {
             "type": "rtp",
             "id": stream_id,
-            "description": f"Location: {device['location']}, port: {port}",
+            "description": f"Location: {device['location']}",
             "audio": False,
             "video": True,
             "videoport": port,
@@ -302,8 +302,8 @@ def main():
             logging.error("Error getting devices from the cluster server.")
             time.sleep(args.scan_interval)
             continue
-        logging.info(f"Found {len(devices)} devices.")
         on_devices = [device for device in devices if device["is_up"]]
+        logging.info(f"Found {len(on_devices)} devices that are on.")
 
         on_devices_sorted = sorted(on_devices, key=lambda d: d["mac_address"])
         current_device_ids = set(device["mac_address"] for device in on_devices_sorted)
