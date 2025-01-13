@@ -17,4 +17,4 @@ class ScanLogSerializer(serializers.ModelSerializer):
 class DeviceStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeviceStatus
-        fields = ['mac_address', 'ip_address', 'location', 'version', 'is_up', 'last_seen', 'initial_uptime']
+        exclude = ['id']
