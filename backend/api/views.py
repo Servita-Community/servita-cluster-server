@@ -1,8 +1,10 @@
 # backend/api/views.py
+import requests
+import json
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from django.utils import timezone
 from rest_framework import status
+from django.utils import timezone
 from .models import ScanLog, PingLog, DeviceStatus
 from .serializers import ScanLogSerializer, DeviceStatusSerializer
 import requests
@@ -183,3 +185,104 @@ def update_device_status(request, mac_address):
 
     device.save()
     return Response({"message": "Device status updated"}, status=status.HTTP_200_OK)
+
+def send_request_to_device(ip_address, endpoint, payload):
+    url = f"http://{ip_address}{endpoint}"
+
+    try:
+        response = requests.post(url, data=json.dumps(payload), timeout=5)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        return {"ip": ip_address, "success": True, "response": response.json()}
+    except requests.RequestException as e:
+        return {"ip": ip_address, "success": False, "error": str(e)}
+
+@api_view(['POST'])
+def set_ota_server(request):
+    """Set the OTA server on selected devices."""
+    devices = request.data.get('devices', [])
+    server = request.data.get('server', '')
+    if not server:
+        return Response({"error": "OTA server is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    results = []
+    for device in devices:
+        ip = device.get('ip_address')
+        results.append(send_request_to_device(ip, "/otaserver", {"server": server}))
+
+    return Response({"results": results}, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+def set_led_color(request):
+    """Set the LED color on selected devices."""
+    devices = request.data.get('devices', [])
+    red = request.data.get('red', 0)
+    green = request.data.get('green', 0)
+    blue = request.data.get('blue', 0)
+
+    results = []
+    for device in devices:
+        ip = device.get('ip_address')
+        results.append(send_request_to_device(ip, "/ledcolor", {"red": red, "green": green, "blue": blue}))
+
+    return Response({"results": results}, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+def connect_network(request):
+    """Connect devices to a network."""
+    devices = request.data.get('devices', [])
+    ssid = request.data.get('ssid', '')
+    password = request.data.get('password', '')
+
+    if not ssid or not password:
+        return Response({"error": "SSID and password are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+    results = []
+    for device in devices:
+        ip = device.get('ip_address')
+        results.append(send_request_to_device(ip, "/connect", {"ssid": ssid, "password": password}))
+
+    return Response({"results": results}, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+def trigger_deep_sleep(request):
+    """Trigger deep sleep mode on selected devices."""
+    devices = request.data.get('devices', [])
+
+    results = []
+    for device in devices:
+        ip = device.get('ip_address')
+        results.append(send_request_to_device(ip, "/deepsleep", {}))
+
+    return Response({"results": results}, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+def set_stream_settings(request):
+    """Set stream settings on selected devices."""
+    devices = request.data.get('devices', [])
+    fps = request.data.get('fps', None)
+    resolution = request.data.get('resolution', None)
+    bitrate = request.data.get('bitrate', None)
+    exposureMode = request.data.get('exposureMode', None)
+    exposure = request.data.get('exposure', None)
+    gain = request.data.get('gain', None)
+
+    results = []
+    for device in devices:
+        ip = device.get('ip_address')
+        payload = {}
+        if fps is not None:
+            payload['fps'] = fps
+        if resolution is not None:
+            payload['resolution'] = resolution
+        if bitrate is not None:
+            payload['bitrate'] = bitrate
+        if exposureMode is not None:
+            payload['exposureMode'] = exposureMode
+        if exposure is not None:
+            payload['exposure'] = exposure
+        if gain is not None:
+            payload['gain'] = gain
+
+        results.append(send_request_to_device(ip, "/setstream", payload))
+
+    return Response({"results": results}, status=status.HTTP_200_OK)

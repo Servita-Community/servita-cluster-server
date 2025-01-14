@@ -37,8 +37,8 @@
     <v-navigation-drawer app v-model="rightDrawer" temporary location="right">
       <v-list>
         <v-list-item
-          v-for="device in devices"
-          :key="device.mac_address"
+          v-for="(device, index) in sortedDevices"
+          :key="device.mac_address + '-' + index"
           :href="'http://' + device.ip_address"
           target="_blank"
           style="text-decoration: none; color: inherit;"
@@ -46,19 +46,18 @@
           <template v-slot:prepend>
             <v-icon :color="device.is_up ? 'green' : 'red'">mdi-circle</v-icon>
           </template>
-          <v-list-item-content>
-            <v-list-item-title>{{ device.ip_address }}</v-list-item-title>
-            <v-list-item-subtitle>MAC: {{ device.mac_address }}</v-list-item-subtitle>
-            <v-list-item-subtitle>
-              {{ device.is_up ? 'Uptime: ' + device.uptime : 'Downtime: ' + device.downtime }}
-            </v-list-item-subtitle>
-            <v-list-item-subtitle v-if="device.location && device.location.length > 0">
-              Location: {{ device.location }}
-            </v-list-item-subtitle>
-            <v-list-item-subtitle v-if="device.version && device.version.length > 0">
-              Firmware: {{ device.version }}
-            </v-list-item-subtitle>
-          </v-list-item-content>
+
+          <v-list-item-title>{{ device.ip_address }}</v-list-item-title>
+          <v-list-item-subtitle>MAC: {{ device.mac_address }}</v-list-item-subtitle>
+          <v-list-item-subtitle>
+            {{ device.is_up ? 'Uptime: ' + device.uptime : 'Downtime: ' + device.downtime }}
+          </v-list-item-subtitle>
+          <v-list-item-subtitle v-if="device.location && device.location.length > 0">
+            Location: {{ device.location }}
+          </v-list-item-subtitle>
+          <v-list-item-subtitle v-if="device.version && device.version.length > 0">
+            Firmware: {{ device.version }}
+          </v-list-item-subtitle>
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
@@ -66,7 +65,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import routes from '../routes'
 
@@ -75,9 +74,8 @@ const rightDrawer = ref(false)
 const devices = ref([])
 
 // Backend base URL based on current page origin
-const baseUrl = `${window.location.origin}/api/devices/statuses/`
+const baseUrl = `http://${window.location.hostname}:${window.location.port}/api/devices/statuses/`
 
-// Fetch device statuses from backend
 async function fetchDeviceStatuses() {
   try {
     const response = await axios.get(baseUrl)
@@ -91,19 +89,16 @@ async function fetchDeviceStatuses() {
   }
 }
 
-// Calculate uptime based on initial_uptime
 function calculateUptime(initialUptime) {
   const uptimeDuration = Math.floor((new Date() - new Date(initialUptime)) / 1000)
   return formatDuration(uptimeDuration)
 }
 
-// Calculate downtime based on last_seen
 function calculateDowntime(lastSeen) {
   const downtimeDuration = Math.floor((new Date() - new Date(lastSeen)) / 1000)
   return formatDuration(downtimeDuration)
 }
 
-// Format duration in hours, minutes, and seconds
 function formatDuration(seconds) {
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
@@ -111,17 +106,27 @@ function formatDuration(seconds) {
   return `${hours}h ${minutes}m ${secs}s`
 }
 
-// Set up a timer to refresh device statuses every 10 seconds
+// Computed property to sort devices
+const sortedDevices = computed(() => {
+  const activeDevices = devices.value
+    .filter(device => device.is_up)
+    .sort((a, b) => new Date(b.initial_uptime) - new Date(a.initial_uptime)) // Most recently active first
+  const inactiveDevices = devices.value
+    .filter(device => !device.is_up)
+    .sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen)) // Most recently inactive first
+  return [...activeDevices, ...inactiveDevices]
+})
+
+// Refresh device statuses every 10 seconds
 let intervalId
 onMounted(() => {
-  fetchDeviceStatuses() // initial fetch
-  intervalId = setInterval(fetchDeviceStatuses, 10000) // fetch every 10 seconds
+  fetchDeviceStatuses()
+  intervalId = setInterval(fetchDeviceStatuses, 10000)
 })
 
 onUnmounted(() => {
-  clearInterval(intervalId) // clean up on unmount
+  clearInterval(intervalId)
 })
-
 </script>
 
 <style scoped>
