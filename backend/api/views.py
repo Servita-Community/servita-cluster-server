@@ -7,6 +7,17 @@ from rest_framework import status
 from django.utils import timezone
 from .models import ScanLog, PingLog, DeviceStatus
 from .serializers import ScanLogSerializer, DeviceStatusSerializer
+import requests
+import logging
+from lighthousenvr import nvr_commands
+
+logger = logging.getLogger(__name__)
+NVR_SERVER = "127.0.0.1"
+NVR_PORT = 8080
+ID_BASE = 6000
+ARCHIVE_HOURS = 24
+ARCHIVE_SEGMENT_LENGTH = 20
+
 
 @api_view(['GET'])
 def get_scans(request):
@@ -14,6 +25,7 @@ def get_scans(request):
     scans = ScanLog.objects.all().order_by('-timestamp')
     serializer = ScanLogSerializer(scans, many=True)
     return Response(serializer.data)
+
 
 @api_view(['POST'])
 def create_scan(request):
@@ -24,6 +36,22 @@ def create_scan(request):
     # Track MAC addresses that are part of the scan
     scanned_mac_addresses = set()
 
+    nvr_alive = True
+    try:
+        nvr_response = requests.get(f"http://{NVR_SERVER}:{NVR_PORT}/api/manage")
+        nvr_response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error connecting to NVR: {e}")
+        nvr_alive = False
+    nvr_streams = nvr_response.json() if nvr_alive else {}
+
+    stream_ids = {s.get('id'): False for s in nvr_streams.get('streams', []) if s.get('id')}
+    db_devices = DeviceStatus.objects.all()
+    for device in db_devices:
+        if device.stream_id is not None:
+            stream_ids[device.stream_id] = False
+
+    found_db_devices = []
     # Process each device in the scan
     for device in devices:
         mac_address = device.get('mac_address') or device.get('mac')
@@ -48,6 +76,7 @@ def create_scan(request):
                 'last_seen': timezone.now(),
             },
         )
+        found_db_devices.append(device_status)
 
         if not created:
             # Update existing device status
@@ -61,6 +90,58 @@ def create_scan(request):
             device_status.last_seen = timezone.now()
             device_status.save()
 
+        # Assign a stream ID to the device if it doesn't already have one
+        stream_id = device_status.stream_id
+        if stream_id is None:
+            i = ID_BASE
+            while True:
+                if stream_ids.get(i) is None:
+                    stream_id = i
+                    break
+                i += 1
+            device_status.stream_id = stream_id
+            device_status.save()
+
+        # TODO: Add stream to nvr or update it if it already exists
+        if nvr_alive:
+            try:
+                nvr_commands.add_rtsp_stream(
+                    nvr_server=NVR_SERVER,
+                    name=device_status.location,
+                    stream_id=stream_id,
+                    url=f"rtsp://{ip_address}:554/",
+                    nvr_port=NVR_PORT,
+                    description=f"Stream for {device_status.mac_address}",
+                    archive_hours=ARCHIVE_HOURS,
+                    archive_segment_length=ARCHIVE_SEGMENT_LENGTH,
+                )
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error adding stream to NVR: {e}")
+                pass
+
+        stream_ids[stream_id] = True
+
+    # Disable any streams that were not found in this scan
+    for stream_id, found in stream_ids.items():
+        if found:
+            continue
+        device_status = DeviceStatus.objects.filter(stream_id=stream_id).first()
+        if device_status is None:
+            continue
+        device_status.stream_id = None
+
+        try:
+            response = nvr_commands.disable_stream(
+                nvr_server=NVR_SERVER,
+                name=device_status.location,
+                nvr_port=NVR_PORT,
+            )
+            response.raise_for_status()
+        except Exception as e:
+            logger.error(f"Error disabling stream {stream_id}: {e}")
+            pass
+        device_status.save()
+
     # Set to "down" any devices not seen in this scan that were previously "up" without updating last_seen
     DeviceStatus.objects.filter(is_up=True).exclude(mac_address__in=scanned_mac_addresses).update(
         is_up=False, initial_uptime=None
@@ -68,12 +149,14 @@ def create_scan(request):
 
     return Response({"message": "Scan created and statuses updated successfully"}, status=status.HTTP_201_CREATED)
 
+
 @api_view(['GET'])
 def get_device_statuses(request):
     """Retrieve the full list of device statuses."""
     statuses = DeviceStatus.objects.all()
     serializer = DeviceStatusSerializer(statuses, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 @api_view(['PATCH'])
 def update_device_status(request, mac_address):
@@ -96,7 +179,7 @@ def update_device_status(request, mac_address):
 
     if location is not None:
         device.location = location
-    
+
     if version is not None:
         device.version = version
 

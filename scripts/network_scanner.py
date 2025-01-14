@@ -86,6 +86,7 @@ def main():
         print("Starting network scan...")
         devices = scan_network(args.network_cidr, args.timeout, args.workers)
         print(f"Found {len(devices)} devices.")
+        print(f"Devices: {[device['ip_address'] for device in devices]}")
         send_scan_report(devices, args.api_endpoint)
         time.sleep(args.scan_interval)
 
