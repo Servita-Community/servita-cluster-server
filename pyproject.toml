@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "ubivision-cluster-server"
+name = "servita-cluster-server"
 version = "0.1.0"
 description = ""
 authors = ["TeaBear5 <tyler.bair@protonmail.com>"]
@@ -12,7 +12,8 @@ django = "4.2"
 djangorestframework = "^3.15.2"
 requests = "^2.32.3"
 psutil = "^6.1.0"
-lighthousenvr = {git = "https://github.com/LighthouseAvionics/lighthousenvr.git", branch = "master"}
+django-browser-reload = "^1.18.0"
+django-cors-headers = "^4.7.0"
 
 [build-system]
 requires = ["poetry-core"]
