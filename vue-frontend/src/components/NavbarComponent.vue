@@ -4,7 +4,7 @@
       <v-app-bar-nav-icon @click="leftDrawer = !leftDrawer" class="d-flex align-center"></v-app-bar-nav-icon>
       <v-spacer />
       <v-img 
-        src="../../public/ubihere.webp" 
+        src="../../public/image.png" 
         class="logo" 
         width="auto" 
         @click="$router.replace('/')"
@@ -12,7 +12,7 @@
       ></v-img>
       <v-spacer />
       <v-app-bar-nav-icon @click="rightDrawer = !rightDrawer" class="d-flex align-center">
-        <v-icon>mdi-camera</v-icon>
+        <v-icon>mdi-glass-cocktail</v-icon>
       </v-app-bar-nav-icon>
     </v-app-bar>
     <v-navigation-drawer app v-model="leftDrawer">
